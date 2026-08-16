@@ -38,6 +38,9 @@ export interface Alert {
   once: boolean;
   enabled: boolean;
   lastFiredAt: string | null;
+  /** Crossing state owned by the backend: true = waiting for the level to be crossed,
+   *  false = level already taken, null = no price seen yet. */
+  armed?: boolean | null;
 }
 
 export interface NotificationSettings {

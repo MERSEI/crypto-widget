@@ -214,6 +214,7 @@ impl MarketProvider for BinanceProvider {
                 percent_24h: t.price_change_percent.parse().unwrap_or(0.0),
                 quote_volume: t.quote_volume.parse().unwrap_or(0.0),
                 event_time: t.close_time,
+                source: "binance".into(),
             })
             .collect())
     }

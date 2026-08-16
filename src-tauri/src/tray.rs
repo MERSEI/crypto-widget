@@ -20,8 +20,9 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let pin_item = MenuItem::with_id(app, "pin", pin_label(pinned_now), true, None::<&str>)?;
+    let test_item = MenuItem::with_id(app, "test-notification", "Test notification", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&settings_item, &pin_item, &quit_item])?;
+    let menu = Menu::with_items(app, &[&settings_item, &pin_item, &test_item, &quit_item])?;
 
     let icon = app
         .default_window_icon()
@@ -48,6 +49,14 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                 // bare `open-settings` emit while collapsed did nothing at all.
                 commands::expand_internal(app);
                 let _ = app.emit("open-settings", ());
+            }
+            "test-notification" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = commands::fire_test_notification(app).await {
+                        eprintln!("test notification: {e}");
+                    }
+                });
             }
             "pin" => {
                 if let Some(state) = app.try_state::<AppState>() {

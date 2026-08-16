@@ -183,6 +183,7 @@ async fn run_connection(
                                 percent_24h: env.data.percent_24h.parse().unwrap_or(0.0),
                                 quote_volume: env.data.quote_volume.parse().unwrap_or(0.0),
                                 event_time: env.data.event_time,
+                                source: "binance".into(),
                             });
                         }
                     }

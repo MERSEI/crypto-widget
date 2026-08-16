@@ -47,27 +47,60 @@ impl MarketHub {
             .map(|until| Instant::now() < until)
             .unwrap_or(false);
 
-        // `warmup_duration` is the longest enabled spike window; one extra minute keeps a full
-        // window of history available at the moment the oldest point ages out.
-        let retention = self.alerts.warmup_duration() + Duration::from_secs(60);
-        {
-            let mut buffers = self.buffers.write().unwrap();
-            buffers.push(&update.symbol, update.price, retention);
+        // A halted pair keeps returning the price of its last trade over REST forever. It is
+        // still worth storing — the row shows it greyed out rather than as `···` — but it must
+        // not reach the spike buffer or the alert engine, or a weeks-old number would keep
+        // arming and firing rules as if the market had just printed it.
+        let stale = update.is_stale(super::now_ms());
+
+        // Two venues never agree to the last cent, so a source switch would otherwise land in
+        // the buffer as an instant jump and read as a spike.
+        let source_changed = self
+            .tickers
+            .read()
+            .unwrap()
+            .get(&update.symbol)
+            .map(|prev| prev.source != update.source)
+            .unwrap_or(false);
+        if source_changed {
+            self.buffers.write().unwrap().clear_symbol(&update.symbol);
         }
 
-        self.alerts.evaluate(
-            &self.app,
-            &update.symbol,
-            update.price,
-            self.buffers.read().unwrap().get(&update.symbol),
-            warmup_active,
-        );
+        if !stale {
+            // `warmup_duration` is the longest enabled spike window; one extra minute keeps a
+            // full window of history available at the moment the oldest point ages out.
+            let retention = self.alerts.warmup_duration() + Duration::from_secs(60);
+            {
+                let mut buffers = self.buffers.write().unwrap();
+                buffers.push(&update.symbol, update.price, retention);
+            }
+
+            self.alerts.evaluate(
+                &self.app,
+                &update.symbol,
+                update.price,
+                self.buffers.read().unwrap().get(&update.symbol),
+                warmup_active,
+            );
+        }
 
         self.tickers
             .write()
             .unwrap()
             .insert(update.symbol.clone(), update);
         self.dirty.store(true, Ordering::SeqCst);
+    }
+
+    /// True when the primary feed has nothing usable for `symbol` — no snapshot at all, or one
+    /// that has aged past the staleness cutoff. Drives the backup-venue sweep.
+    pub fn needs_backup(&self, symbol: &str) -> bool {
+        let now = super::now_ms();
+        self.tickers
+            .read()
+            .unwrap()
+            .get(symbol)
+            .map(|snapshot| snapshot.is_stale(now))
+            .unwrap_or(true)
     }
 
     pub fn set_connection(&self, state: ConnectionState, attempt: u32) {

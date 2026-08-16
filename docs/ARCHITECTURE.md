@@ -93,19 +93,43 @@ Responses are cached on disk with a TTL, and a *stale* cache read is preferred o
 | Pair catalog / search   | `/api/v3/ticker/24hr`             | `exchange_info.json`, 24h TTL |
 | Chart candles           | `/api/v3/klines` (limit ≤200)     | none — on demand              |
 | Polling fallback        | `/api/v3/ticker/24hr?symbols=[…]` | none                          |
-| USD→CZK rate            | FX host, primary + fallback pair  | 6h TTL                        |
+| USDT→CZK rate           | FX host, primary + fallback pair  | 6h TTL                        |
 
 Search filters the cached catalog (USDT pairs only) by symbol/base substring, sorts by quote
 volume, and truncates to 50 — no network round-trip per keystroke.
+
+### Backup venues
+
+A pair can stop trading on Binance while the coin trades on elsewhere: `TONUSDT` sat in `BREAK`
+status for weeks, and both the WS stream and `/ticker/24hr` kept serving the price of its last
+trade as if it were live. Any snapshot older than `STALE_AFTER_MS` (60s) is therefore treated as
+stale — it is still shown, marked, but it never reaches the spike buffer or the alert engine.
+
+`market/backup.rs` sweeps the watchlist every 20s and asks OKX → Bybit → KuCoin → Gate, in that
+order, for any symbol the primary feed has gone quiet on; the venue that answered is remembered
+per symbol and tried first next time. A newly added pair takes the same route immediately instead
+of waiting for the sweep. The venue that supplied a price rides along in `TickerSnapshot.source`
+and is shown in the row.
+
+No price aggregator sits in that chain on purpose: aggregators are keyed by ticker symbol, and
+symbols get recycled — after Toncoin's rebrand to GRAM, CoinGecko's `TON` is Tokamak Network, so
+a symbol lookup would have answered "TONUSDT = 0.27" with complete confidence.
 
 ## Alerts
 
 Three rule kinds share one evaluation path, run on every incoming tick for the matching symbol:
 
-- `price_above` — `price >= value`
-- `price_below` — `price <= value`
+- `price_above` — fires when the price *crosses* up through `value`
+- `price_below` — fires when the price *crosses* down through `value`
 - `spike` — `|change| >= value%` over `windowMinutes`, comparing the latest price to the oldest
   point still inside the window (`alerts/spike.rs`)
+
+Level rules are edge-triggered, not level-triggered, and carry an `armed` flag for it:
+`Some(true)` waits for a crossing, `Some(false)` means the level has been taken and the price has
+to come back before it counts again, `None` is a rule that has not seen a price yet — its first
+tick only arms it, so a level the market already sits beyond never fires on the spot. (That is
+what made a frozen TONUSDT at 1.60 announce "crossed above 1.3".) A crossing during cooldown is
+consumed, not deferred.
 
 Firing is gated by `cooldownMin` (per rule, based on `lastFiredAt`) and by `once`, which disables
 the rule after it fires. Because firing *mutates the rule*, the backend re-emits the whole alert

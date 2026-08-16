@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { formatPercent } from "../../core/format/percent";
 import { formatPrice } from "../../core/format/price";
+import { useNow } from "../../core/hooks/useNow";
 import { useAlertsStore } from "../../core/store/alerts";
 import { useSettingsStore } from "../../core/store/settings";
 import { useTickersStore } from "../../core/store/tickers";
 import { useUiStore } from "../../core/store/ui";
-import type { TickerSnapshot } from "../../types/market";
+import { STALE_AFTER_MS, type TickerSnapshot } from "../../types/market";
 
 interface Props {
   symbol: string;
@@ -42,10 +43,30 @@ export function TickerRow({ symbol, onToggle, onRemove, onEditAlert }: Props) {
   const percent = ticker?.percent24h ?? 0;
   const flashClass = flash === "up" ? "ticker-row--tick-up" : flash === "down" ? "ticker-row--tick-down" : "";
 
+  // A halted pair keeps its last traded price forever: the number stops changing but nothing
+  // about it says so. Age it against the wall clock instead of trusting that a fresh tick
+  // would have arrived.
+  const now = useNow();
+  const isStale = !!ticker && now - ticker.eventTime > STALE_AFTER_MS;
+  const backupSource = ticker && ticker.source !== "binance" ? ticker.source : null;
+
   return (
-    <div className={`ticker-row ${flashClass}`}>
+    <div className={`ticker-row ${flashClass} ${isStale ? "ticker-row--stale" : ""}`}>
       <div className="ticker-row__main" onClick={onToggle}>
         <span className="ticker-row__symbol">{symbol}</span>
+        {isStale && (
+          <span
+            className="ticker-row__badge ticker-row__badge--stale"
+            title="No live quote — this is the last price the pair traded at"
+          >
+            STALE
+          </span>
+        )}
+        {!isStale && backupSource && (
+          <span className="ticker-row__badge" title={`Price from ${backupSource} — Binance has no live quote`}>
+            {backupSource.toUpperCase()}
+          </span>
+        )}
         <span className="ticker-row__price mono-nums">{displayPrice(ticker, fiat, fxRate)}</span>
         <span
           className={`ticker-row__percent mono-nums ${

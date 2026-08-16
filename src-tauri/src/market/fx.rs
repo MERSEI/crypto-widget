@@ -8,7 +8,7 @@ const TTL: Duration = Duration::from_secs(6 * 3600);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FxRate {
-    pub pair: String, // "USD/CZK"
+    pub pair: String, // "USDT/CZK"
     pub rate: f64,
     pub as_of: String, // human-readable, e.g. "08.08 09:00"
 }
@@ -40,7 +40,10 @@ impl FxProvider {
         }
     }
 
-    pub async fn usd_to_czk(&self) -> Option<FxRate> {
+    /// Prices in the widget are quoted in USDT, so the fiat column converts USDT → CZK. No FX
+    /// desk quotes USDT, and the peg holds to a fraction of a percent, so the rate itself is
+    /// still fetched as USD → CZK — only the label says what it is actually applied to.
+    pub async fn usdt_to_czk(&self) -> Option<FxRate> {
         if let Some(cached) = cache::read_if_fresh::<FxRate>(&self.cache_path, TTL) {
             return Some(cached);
         }
@@ -64,7 +67,7 @@ impl FxProvider {
         let resp = self.client.get(url).send().await.ok()?.error_for_status().ok()?;
         let parsed: ExchangerateHostResponse = resp.json().await.ok()?;
         Some(FxRate {
-            pair: "USD/CZK".into(),
+            pair: "USDT/CZK".into(),
             rate: parsed.rates.czk,
             as_of: now_label(),
         })
@@ -82,7 +85,7 @@ impl FxProvider {
                 let amount: f64 = cols[2].trim().parse().ok()?;
                 let czk_per_usd: f64 = cols[4].trim().replace(',', ".").parse().ok()?;
                 return Some(FxRate {
-                    pair: "USD/CZK".into(),
+                    pair: "USDT/CZK".into(),
                     rate: czk_per_usd / amount,
                     as_of: now_label(),
                 });

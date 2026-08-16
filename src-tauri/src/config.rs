@@ -100,6 +100,13 @@ pub struct Alert {
     pub enabled: bool,
     #[serde(default)]
     pub last_fired_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Crossing state for `price_above` / `price_below`: `Some(true)` means the price is on the
+    /// waiting side of the level and a crossing would fire, `Some(false)` means the level has
+    /// already been taken and the price has to come back before it counts again. `None` is a
+    /// rule that has not seen a price yet — the first tick only arms it, so a level the market
+    /// is already beyond never fires on the spot.
+    #[serde(default)]
+    pub armed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

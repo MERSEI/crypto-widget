@@ -9,6 +9,7 @@ function ticker(overrides: Partial<TickerSnapshot> = {}): TickerSnapshot {
     percent24h: 1,
     quoteVolume: 1000,
     eventTime: 1,
+    source: "binance",
     ...overrides,
   };
 }
@@ -38,6 +39,23 @@ describe("useTickersStore", () => {
     const after = useTickersStore.getState().bySymbol;
     expect(after).not.toBe(before);
     expect(after.BTCUSDT.price).toBe(101);
+  });
+
+  it("stores an unchanged price once its timestamp has moved on", () => {
+    // A quiet pair priced by a backup venue prints the same number every sweep; skipping the
+    // update would let the row age into the STALE badge with a fresh quote in hand.
+    useTickersStore.getState().applySnapshot([ticker({ eventTime: 1_000 })]);
+    const before = useTickersStore.getState().bySymbol;
+    useTickersStore.getState().applySnapshot([ticker({ eventTime: 41_000 })]);
+    const after = useTickersStore.getState().bySymbol;
+    expect(after).not.toBe(before);
+    expect(after.BTCUSDT.eventTime).toBe(41_000);
+  });
+
+  it("stores the same price from a different venue", () => {
+    useTickersStore.getState().applySnapshot([ticker()]);
+    useTickersStore.getState().applySnapshot([ticker({ source: "okx" })]);
+    expect(useTickersStore.getState().bySymbol.BTCUSDT.source).toBe("okx");
   });
 
   it("leaves an unrelated symbol's object identity untouched", () => {

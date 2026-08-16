@@ -320,6 +320,27 @@ body {
 .ticker-row__percent--up { color: var(--up); }
 .ticker-row__percent--down { color: var(--down); }
 
+/* A stale row keeps its number readable but stops looking like a live quote. */
+.ticker-row--stale .ticker-row__price,
+.ticker-row--stale .ticker-row__percent {
+  color: var(--text-2);
+}
+
+.ticker-row__badge {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.ticker-row__badge--stale {
+  border-color: var(--down);
+  color: var(--down);
+}
+
 .ticker-row__alert-dot {
   width: 4px;
   height: 4px;
@@ -509,6 +530,13 @@ body {
 
 .settings-panel__label {
   color: var(--text-1);
+}
+
+.settings-panel__hint {
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .toggle {

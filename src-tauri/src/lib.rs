@@ -6,6 +6,7 @@ mod tray;
 mod window;
 
 use config::ConfigState;
+use market::backup::BackupProvider;
 use market::binance_rest::BinanceProvider;
 use market::binance_ws::{self, WsHandle};
 use market::fx::FxProvider;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub hub: Arc<MarketHub>,
     pub ws: WsHandle,
     pub provider: Arc<dyn MarketProvider>,
+    pub backup: Arc<BackupProvider>,
     pub fx: FxProvider,
     pub expanded: AtomicBool,
     /// Bumped on every `WindowEvent::Moved` so a debounced edge snap can tell whether it is
@@ -45,6 +47,12 @@ pub fn run() {
 
             let provider: Arc<dyn MarketProvider> = Arc::new(BinanceProvider::new(config.cache_dir.clone()));
             let ws = binance_ws::spawn(hub.clone(), provider.clone());
+
+            // Keeps watchlist pairs priced when Binance stops quoting them — a halted pair
+            // otherwise keeps serving the price of its last trade for as long as it stays
+            // halted.
+            let backup = Arc::new(BackupProvider::new());
+            market::backup::spawn_watcher(hub.clone(), config.clone(), backup.clone());
 
             let initial_symbols: Vec<String> = config
                 .snapshot()
@@ -76,6 +84,7 @@ pub fn run() {
                 hub,
                 ws,
                 provider,
+                backup,
                 fx,
                 expanded: AtomicBool::new(false),
                 move_gen: AtomicU64::new(0),
@@ -122,6 +131,20 @@ pub fn run() {
 
             tray::setup(&handle)?;
 
+            // Smoke-test hook: `CRYPTO_WIDGET_TEST_NOTIFICATION=1` fires one sample toast a few
+            // seconds after startup, so the notification chain can be checked from a script
+            // without clicking through the tray.
+            if std::env::var("CRYPTO_WIDGET_TEST_NOTIFICATION").is_ok() {
+                let test_handle = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    match commands::fire_test_notification(test_handle).await {
+                        Ok(msg) => println!("{msg}"),
+                        Err(e) => eprintln!("test notification: {e}"),
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -140,6 +163,7 @@ pub fn run() {
             commands::upsert_alert,
             commands::delete_alert,
             commands::set_notifications,
+            commands::send_test_notification,
             commands::set_autostart,
             commands::start_drag,
             commands::drag_ended,

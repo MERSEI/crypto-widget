@@ -20,13 +20,18 @@ in half a second without switching windows.
 - **Charts.** Per-coin accordion with `lightweight-charts` — area or candlestick, 1h/4h/1d/1w
   timeframes, klines pulled on demand from the REST API.
 - **Alerts.** `price_above`, `price_below`, and rolling-window `spike` rules with cooldown and
-  one-shot modes. Evaluated in Rust, so they keep firing while the panel is collapsed; delivery
+  one-shot modes. Level rules are edge-triggered: they fire on a crossing, not on a price that
+  already sits past the level, and re-arm once it comes back. A stale price never fires anything. Evaluated in Rust, so they keep firing while the panel is collapsed; delivery
   is a native Windows toast.
+- **Backup venues.** When Binance stops quoting a watchlist pair — a halted pair keeps serving
+  the price of its last trade forever — OKX, Bybit, KuCoin, and Gate are asked in turn, and the
+  row shows which venue answered. A price no one can refresh is marked `STALE` instead of
+  passing for live.
 - **Resilient by design.** Exponential backoff with jitter on WS failure, automatic REST polling
   fallback after 3 failed attempts, stale-tick detection, and a warmup window after reconnect so
   a connection gap can never be mistaken for a price spike. The last valid numbers stay on
   screen — the panel never blanks out.
-- **Optional fiat column.** USD→CZK conversion from a cached FX endpoint with a primary/fallback
+- **Optional fiat column.** USDT→CZK conversion from a cached FX endpoint with a primary/fallback
   pair and a 6h TTL.
 - **Tray integration.** Show/hide, pin, settings, and quit from the system tray.
 

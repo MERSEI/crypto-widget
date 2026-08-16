@@ -45,7 +45,7 @@ pub async fn get_klines(
 
 #[tauri::command]
 pub async fn get_fx_rate(state: State<'_, AppState>) -> Result<Option<FxRate>, String> {
-    Ok(state.fx.usd_to_czk().await)
+    Ok(state.fx.usdt_to_czk().await)
 }
 
 fn sync_ws_symbols(state: &State<'_, AppState>) {
@@ -78,8 +78,16 @@ pub async fn add_watchlist_symbol(state: State<'_, AppState>, symbol: String) ->
     // Prices otherwise arrive only over the WS ticker stream, which stays silent for a pair
     // that isn't trading (TONUSDT sits in Binance's `BREAK` status, for instance) — the row
     // would show `···` forever. One REST snapshot gives every added pair a number right away.
-    if let Ok(snapshots) = state.provider.poll_tickers(&[symbol]).await {
+    if let Ok(snapshots) = state.provider.poll_tickers(&[symbol.clone()]).await {
         for snapshot in snapshots {
+            state.hub.apply_ticker(snapshot);
+        }
+    }
+
+    // Binance answered with the last trade of a halted pair (or with nothing): go straight to
+    // the backup venues rather than making the newly added row wait for the sweep.
+    if state.hub.needs_backup(&symbol) {
+        if let Some(snapshot) = state.backup.fetch(&symbol).await {
             state.hub.apply_ticker(snapshot);
         }
     }
@@ -179,6 +187,48 @@ pub async fn set_notifications(state: State<'_, AppState>, toast: bool, sound: b
     }
     state.config.mark_dirty();
     Ok(())
+}
+
+/// Sends one synthetic "BTC moved 1%" toast through the exact code path a real spike alert
+/// uses, so the notification chain (toggles → OS toast → sound) can be checked without waiting
+/// for the market to actually move. Uses the live price when the hub already has one.
+pub async fn fire_test_notification(app: AppHandle) -> Result<String, String> {
+    const SYMBOL: &str = "BTCUSDT";
+
+    // Scoped so no lock guard or non-Send `State` is held across the await below.
+    let (cached_price, provider, notifications) = {
+        let state = app.state::<AppState>();
+        let cached = state
+            .hub
+            .tickers_snapshot()
+            .into_iter()
+            .find(|t| t.symbol == SYMBOL)
+            .map(|t| t.price);
+        (cached, state.provider.clone(), state.config.snapshot().notifications)
+    };
+
+    let price = match cached_price {
+        Some(p) if p > 0.0 => p,
+        _ => provider
+            .poll_tickers(&[SYMBOL.to_string()])
+            .await
+            .ok()
+            .and_then(|snapshots| snapshots.into_iter().next())
+            .map(|t| t.price)
+            .unwrap_or(0.0),
+    };
+
+    let alert = crate::alerts::engine::test_spike_alert(SYMBOL, 1.0, 15);
+    if crate::alerts::engine::notify(&app, &alert, price, &notifications) {
+        Ok(format!("Test toast sent ({SYMBOL} @ {price})"))
+    } else {
+        Err("Alert toasts are off — enable them in Settings".into())
+    }
+}
+
+#[tauri::command]
+pub async fn send_test_notification(app: AppHandle) -> Result<String, String> {
+    fire_test_notification(app).await
 }
 
 #[tauri::command]

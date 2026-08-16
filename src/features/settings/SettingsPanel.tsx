@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { commands } from "../../core/ipc/commands";
 import { useSettingsStore } from "../../core/store/settings";
 import { useUiStore } from "../../core/store/ui";
@@ -22,6 +23,8 @@ export function SettingsPanel({ onClose }: Props) {
   const setNotifications = useSettingsStore((s) => s.setNotifications);
   const setAutostart = useSettingsStore((s) => s.setAutostart);
   const setFxRate = useUiStore((s) => s.setFxRate);
+  // Declared before the early return: hooks can't sit behind a conditional.
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   if (!settings) return null;
 
@@ -32,6 +35,14 @@ export function SettingsPanel({ onClose }: Props) {
     if (next) {
       const rate = await commands.getFxRate();
       setFxRate(rate);
+    }
+  };
+
+  const handleTest = async () => {
+    try {
+      setTestResult(await commands.sendTestNotification());
+    } catch (e) {
+      setTestResult(String(e));
     }
   };
 
@@ -88,6 +99,14 @@ export function SettingsPanel({ onClose }: Props) {
           onChange={(v) => void setNotifications(settings.notifications.toast, v)}
         />
       </div>
+
+      <div className="settings-panel__row">
+        <span className="settings-panel__label">Test notification</span>
+        <button className="icon-btn" title="Send a sample BTC spike toast" onClick={() => void handleTest()}>
+          Send
+        </button>
+      </div>
+      {testResult && <div className="settings-panel__hint">{testResult}</div>}
 
       <div className="settings-panel__row">
         <span className="settings-panel__label">Launch at startup</span>

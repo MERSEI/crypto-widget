@@ -23,6 +23,7 @@ export const commands = {
   deleteAlert: (id: string) => invoke<void>("delete_alert", { id }),
 
   setNotifications: (toast: boolean, sound: boolean) => invoke<void>("set_notifications", { toast, sound }),
+  sendTestNotification: () => invoke<string>("send_test_notification"),
   setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
 
   startDrag: () => invoke<void>("start_drag"),
