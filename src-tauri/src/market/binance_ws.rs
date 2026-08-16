@@ -253,52 +253,6 @@ async fn run_connection(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn backoff_starts_at_one_second_with_jitter() {
-        let mut b = Backoff::new();
-        let delay = b.next_delay();
-        assert!(delay >= Duration::from_millis(800) && delay <= Duration::from_millis(1200));
-    }
-
-    #[test]
-    fn backoff_grows_and_caps_at_thirty_seconds() {
-        let mut b = Backoff::new();
-        for _ in 0..20 {
-            b.next_delay();
-        }
-        let delay = b.next_delay();
-        assert!(delay <= Duration::from_secs_f64(36.0), "capped step should never exceed 30s + jitter");
-    }
-
-    #[test]
-    fn parses_a_real_combined_ticker_frame() {
-        // Trimmed sample of an actual `<symbol>@ticker` payload in combined-stream form.
-        let raw = r#"{"stream":"btcusdt@ticker","data":{"e":"24hrTicker","E":1723713600000,
-            "s":"BTCUSDT","p":"60.91000000","P":"0.097","c":"62967.94000000",
-            "q":"1234567.89000000","o":"62907.03000000","h":"63100.00000000","l":"62500.00000000"}}"#;
-        let env: CombinedEnvelope = serde_json::from_str(raw).expect("frame must parse");
-        assert_eq!(env.data.symbol, "BTCUSDT");
-        assert_eq!(env.data.last_price.parse::<f64>().unwrap(), 62967.94);
-        assert_eq!(env.data.percent_24h.parse::<f64>().unwrap(), 0.097);
-        assert_eq!(env.data.event_time, 1723713600000);
-    }
-
-    #[test]
-    fn backoff_resets_to_first_step() {
-        let mut b = Backoff::new();
-        for _ in 0..5 {
-            b.next_delay();
-        }
-        b.reset();
-        let delay = b.next_delay();
-        assert!(delay >= Duration::from_millis(800) && delay <= Duration::from_millis(1200));
-    }
-}
-
 /// REST polling fallback after repeated WS failures. Keeps trying to re-establish the socket
 /// every `WS_RETRY_WHILE_POLLING`; returns to the caller either way so the outer loop retries.
 async fn run_fallback_polling(
@@ -347,5 +301,51 @@ async fn run_fallback_polling(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backoff_starts_at_one_second_with_jitter() {
+        let mut b = Backoff::new();
+        let delay = b.next_delay();
+        assert!(delay >= Duration::from_millis(800) && delay <= Duration::from_millis(1200));
+    }
+
+    #[test]
+    fn backoff_grows_and_caps_at_thirty_seconds() {
+        let mut b = Backoff::new();
+        for _ in 0..20 {
+            b.next_delay();
+        }
+        let delay = b.next_delay();
+        assert!(delay <= Duration::from_secs_f64(36.0), "capped step should never exceed 30s + jitter");
+    }
+
+    #[test]
+    fn parses_a_real_combined_ticker_frame() {
+        // Trimmed sample of an actual `<symbol>@ticker` payload in combined-stream form.
+        let raw = r#"{"stream":"btcusdt@ticker","data":{"e":"24hrTicker","E":1723713600000,
+            "s":"BTCUSDT","p":"60.91000000","P":"0.097","c":"62967.94000000",
+            "q":"1234567.89000000","o":"62907.03000000","h":"63100.00000000","l":"62500.00000000"}}"#;
+        let env: CombinedEnvelope = serde_json::from_str(raw).expect("frame must parse");
+        assert_eq!(env.data.symbol, "BTCUSDT");
+        assert_eq!(env.data.last_price.parse::<f64>().unwrap(), 62967.94);
+        assert_eq!(env.data.percent_24h.parse::<f64>().unwrap(), 0.097);
+        assert_eq!(env.data.event_time, 1723713600000);
+    }
+
+    #[test]
+    fn backoff_resets_to_first_step() {
+        let mut b = Backoff::new();
+        for _ in 0..5 {
+            b.next_delay();
+        }
+        b.reset();
+        let delay = b.next_delay();
+        assert!(delay >= Duration::from_millis(800) && delay <= Duration::from_millis(1200));
     }
 }

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch makes the in-flight run pointless — the Rust job is the
+# expensive one, so cancel rather than queue.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: frontend (typecheck, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build renderer
+        run: npm run build
+
+  rust:
+    name: rust (clippy, tests)
+    # Windows is the target platform: toasts, tray, and work-area detection are only
+    # exercised there. Linux would also need the webkit2gtk stack just to compile Tauri.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # `tauri::generate_context!` resolves `frontendDist: ../dist` at compile time, so the
+      # renderer has to be built before anything Rust-side will even typecheck.
+      - name: Build renderer
+        run: |
+          npm ci
+          npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # No `cargo fmt --check`: the source is hand-wrapped wider than rustfmt's defaults, so
+      # the gate would demand a whole-tree reformat rather than catch anything.
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

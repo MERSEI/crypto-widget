@@ -58,10 +58,10 @@ pub struct BinanceProvider {
 /// also means an extra column added by Binance later can't break charts again.
 fn parse_klines(body: &str) -> Result<Vec<Candle>, String> {
     let rows: Vec<Vec<serde_json::Value>> = serde_json::from_str(body).map_err(|e| e.to_string())?;
-    Ok(rows.iter().filter_map(row_to_candle).collect())
+    Ok(rows.iter().filter_map(|row| row_to_candle(row)).collect())
 }
 
-fn row_to_candle(row: &Vec<serde_json::Value>) -> Option<Candle> {
+fn row_to_candle(row: &[serde_json::Value]) -> Option<Candle> {
     let price = |index: usize| -> Option<f64> { row.get(index)?.as_str()?.parse().ok() };
     Some(Candle {
         time: row.first()?.as_i64()? / 1000,
@@ -219,6 +219,20 @@ impl MarketProvider for BinanceProvider {
     }
 }
 
+/// Binance's `symbols=[...]` param needs URL-encoding of `[`, `]`, `"`, `,` — avoid pulling in
+/// a whole percent-encoding crate for four characters.
+fn urlencoding_light(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '[' => "%5B".to_string(),
+            ']' => "%5D".to_string(),
+            '"' => "%22".to_string(),
+            ',' => "%2C".to_string(),
+            other => other.to_string(),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,18 +267,4 @@ mod tests {
         let candles = parse_klines(mixed).expect("a short row must not poison the response");
         assert_eq!(candles.len(), 1);
     }
-}
-
-/// Binance's `symbols=[...]` param needs URL-encoding of `[`, `]`, `"`, `,` — avoid pulling in
-/// a whole percent-encoding crate for four characters.
-fn urlencoding_light(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            '[' => "%5B".to_string(),
-            ']' => "%5D".to_string(),
-            '"' => "%22".to_string(),
-            ',' => "%2C".to_string(),
-            other => other.to_string(),
-        })
-        .collect()
 }

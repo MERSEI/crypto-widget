@@ -1,5 +1,7 @@
 # crypto-widget
 
+[![CI](https://github.com/MERSEI/crypto-widget/actions/workflows/ci.yml/badge.svg)](https://github.com/MERSEI/crypto-widget/actions/workflows/ci.yml)
+
 A resident desktop widget for peripheral crypto-market awareness — a draggable pill docked to
 a screen edge that expands into a compact terminal-style panel: a personal watchlist with live
 Binance prices, per-coin charts, and price/spike alerts delivered as Windows toasts.
@@ -71,6 +73,11 @@ cd src-tauri && cargo check
 npm run test                 # vitest — format helpers, ticker store selectors
 cd src-tauri && cargo test   # spike detector, alert engine, backoff, REST/WS parsers, config I/O
 ```
+
+Both suites plus the typecheck, the renderer build, and `clippy -D warnings` run in CI
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) on every push and pull request — the
+frontend job on Linux, the Rust job on Windows, since that is the platform the tray, toasts,
+and window geometry actually target.
 
 ## Build
 

@@ -200,6 +200,14 @@ prices is the kind of thing that silently regresses.
 | TypeScript     | `npm run test`      | Format helpers, ticker store selectors                                    |
 | Rust           | `cargo test`        | Spike detector, alert engine decision logic, WS backoff, kline/ticker parsing (against captured real payloads), settings load/corrupt-recovery |
 
+CI (`.github/workflows/ci.yml`) runs both suites on every push and PR, split by platform: the
+frontend job (typecheck → vitest → `vite build`) on Linux, the Rust job (`clippy -D warnings` →
+`cargo test`) on Windows. The Rust job builds the renderer first — `tauri::generate_context!`
+resolves `frontendDist: ../dist` at compile time, so without a `dist/` directory the crate does
+not even typecheck, let alone test. There is no `cargo fmt --check`: this source is hand-wrapped
+wider than rustfmt's defaults, so the gate would demand a whole-tree reformat instead of catching
+anything real.
+
 The parser tests deliberately feed real API payloads including malformed and extra-column rows:
 Binance adds trailing kline columns over time, and `"NaN".parse::<f64>()` succeeds — both were
 live panic paths before they were tests.
