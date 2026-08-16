@@ -1,0 +1,598 @@
+:root {
+  --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+
+  --bg-0: #0a0d0f;
+  --bg-1: #10151a;
+  --bg-2: #161c22;
+  --border: #232b32;
+  --border-soft: #1a2027;
+  --text-0: #e7edf2;
+  --text-1: #9aacb8;
+  --text-2: #5c6b76;
+  --accent: #4fa3ff;
+  --up: #35d07f;
+  --down: #ef5b5b;
+  --warn: #e0a83d;
+  --danger: #ef5b5b;
+
+  --row-height: 26px;
+  --radius: 6px;
+  --transition-fast: 120ms ease;
+  --transition-panel: 180ms ease;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.mono-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-root {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Pill (collapsed) ---------- */
+
+.pill {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  cursor: grab;
+  padding: 0 9px;
+  overflow: hidden;
+}
+
+.pill:active {
+  cursor: grabbing;
+}
+
+.pill__ticker {
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pill__delta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-2);
+  flex-shrink: 0;
+}
+
+.pill__dot--up { background: var(--up); }
+.pill__dot--down { background: var(--down); }
+
+.pill__connection {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.pill__connection--live { background: var(--up); }
+.pill__connection--stale,
+.pill__connection--reconnecting { background: var(--warn); }
+.pill__connection--polling { background: #e08a3d; }
+.pill__connection--offline { background: var(--danger); }
+
+/* ---------- Panel (expanded) ---------- */
+
+.panel {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.panel__header:active {
+  cursor: grabbing;
+}
+
+.panel__title {
+  color: var(--text-1);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-1);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+
+.icon-btn--active {
+  color: var(--accent);
+}
+
+.panel__body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Onboarding ---------- */
+
+.onboarding {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-1);
+}
+
+.onboarding__cta {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  color: var(--text-0);
+  transition: border-color var(--transition-fast);
+}
+
+.onboarding__cta:hover {
+  border-color: var(--accent);
+}
+
+/* ---------- Search dialog ---------- */
+
+.search-dialog {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-0);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.search-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.search-dialog__input {
+  flex: 1;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--text-0);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.search-dialog__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.search-dialog__results {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.search-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--row-height);
+  padding: 0 10px;
+  color: var(--text-0);
+  transition: background var(--transition-fast);
+}
+
+.search-result-row:hover {
+  background: var(--bg-1);
+}
+
+.search-result-row__volume {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.search-dialog__empty {
+  padding: 16px;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* ---------- Watchlist ---------- */
+
+.watchlist {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The body is a flex column that scrolls; without this its children negotiate their heights
+   away and the chart accordion collapses to a sliver instead of pushing the list down. */
+.panel__body > *,
+.watchlist > * {
+  flex-shrink: 0;
+}
+
+.ticker-row {
+  display: flex;
+  align-items: center;
+  height: var(--row-height);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-soft);
+  transition: background 200ms ease;
+}
+
+.ticker-row--tick-up {
+  background: rgba(53, 208, 127, 0.14);
+}
+
+.ticker-row--tick-down {
+  background: rgba(239, 91, 91, 0.14);
+}
+
+.ticker-row__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.ticker-row__symbol {
+  color: var(--text-0);
+  width: 78px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticker-row__price {
+  flex: 1;
+  text-align: right;
+  color: var(--text-0);
+}
+
+.ticker-row__percent {
+  width: 64px;
+  text-align: right;
+  color: var(--text-1);
+}
+
+.ticker-row__percent--up { color: var(--up); }
+.ticker-row__percent--down { color: var(--down); }
+
+.ticker-row__alert-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.ticker-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+
+/* ---------- Chart accordion ---------- */
+
+.chart-accordion {
+  overflow: hidden;
+  transition: height var(--transition-panel);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-accordion__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+
+/* Fills whatever the toolbar leaves rather than a hardcoded `calc(100% - 52px)`, which
+   guessed the toolbar's height wrong and left the chart cropped. */
+.chart-accordion__canvas {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.chart-accordion__error {
+  padding: 8px 10px;
+  color: var(--down);
+  font-size: 11px;
+}
+
+.timeframe-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.timeframe-bar__btn {
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.timeframe-bar__btn:hover {
+  color: var(--text-0);
+}
+
+.timeframe-bar__btn--active {
+  color: var(--accent);
+  background: var(--bg-2);
+}
+
+/* ---------- Alerts ---------- */
+
+.alert-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-0);
+  z-index: 10;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-1);
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.alerts-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 11px;
+  color: var(--text-0);
+}
+
+.alerts-list__row--disabled {
+  color: var(--text-2);
+}
+
+.alert-editor {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-1);
+}
+
+.alert-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-editor__row label {
+  width: 76px;
+  color: var(--text-1);
+  font-size: 11px;
+}
+
+.alert-editor__row input,
+.alert-editor__row select {
+  flex: 1;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: var(--text-0);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.alert-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-0);
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06121f;
+}
+
+/* ---------- Settings panel ---------- */
+
+.settings-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-0);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  overflow-y: auto;
+}
+
+.settings-panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.settings-panel__label {
+  color: var(--text-1);
+}
+
+.toggle {
+  width: 30px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.toggle--on .toggle__knob {
+  transform: translateX(14px);
+  background: var(--accent);
+}
+
+/* ---------- Crash fallback ---------- */
+
+.crash {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-0);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.crash__title {
+  color: var(--danger);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.crash__message {
+  color: var(--text-1);
+  font-size: 11px;
+  word-break: break-word;
+}
+
+/* ---------- Status bar ---------- */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-2);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.status-bar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-2);
+}
+
+.status-bar--live .status-bar__dot { background: var(--up); }
+.status-bar--stale .status-bar__dot,
+.status-bar--reconnecting .status-bar__dot { background: var(--warn); }
+.status-bar--polling .status-bar__dot { background: #e08a3d; }
+.status-bar--offline .status-bar__dot { background: var(--danger); }
+
+.status-bar--stale,
+.status-bar--offline {
+  opacity: 0.85;
+}
