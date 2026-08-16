@@ -78,7 +78,7 @@ pub async fn add_watchlist_symbol(state: State<'_, AppState>, symbol: String) ->
     // Prices otherwise arrive only over the WS ticker stream, which stays silent for a pair
     // that isn't trading (TONUSDT sits in Binance's `BREAK` status, for instance) — the row
     // would show `···` forever. One REST snapshot gives every added pair a number right away.
-    if let Ok(snapshots) = state.provider.poll_tickers(&[symbol.clone()]).await {
+    if let Ok(snapshots) = state.provider.poll_tickers(std::slice::from_ref(&symbol)).await {
         for snapshot in snapshots {
             state.hub.apply_ticker(snapshot);
         }
