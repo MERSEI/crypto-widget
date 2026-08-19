@@ -1,4 +1,5 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { FuturesState } from "../../types/futures";
 import type { ConnectionStatus, TickerSnapshot } from "../../types/market";
 import type { Alert } from "../../types/settings";
 
@@ -22,6 +23,12 @@ export function onExpanded(handler: (expanded: boolean) => void): Promise<Unlist
 
 export function onPinned(handler: (pinned: boolean) => void): Promise<UnlistenFn> {
   return listen<boolean>("pinned", (event) => handler(event.payload));
+}
+
+// The futures account is polled by Rust on its own schedule, whether or not the tab is open —
+// so the panel is a listener, not a poller.
+export function onFutures(handler: (state: FuturesState) => void): Promise<UnlistenFn> {
+  return listen<FuturesState>("futures", (event) => handler(event.payload));
 }
 
 // Emitted when an alert fires: the rule itself changes (`lastFiredAt`, and `enabled` for a

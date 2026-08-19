@@ -1,11 +1,15 @@
 mod alerts;
 mod commands;
 mod config;
+mod futures;
 mod market;
+mod referral;
+mod secrets;
 mod tray;
 mod window;
 
 use config::ConfigState;
+use futures::hub::FuturesHub;
 use market::backup::BackupProvider;
 use market::binance_rest::BinanceProvider;
 use market::binance_ws::{self, WsHandle};
@@ -23,6 +27,9 @@ pub struct AppState {
     pub provider: Arc<dyn MarketProvider>,
     pub backup: Arc<BackupProvider>,
     pub fx: FxProvider,
+    /// Private futures account state. Independent of `hub`: it has its own credentials, its own
+    /// rate budget, and it stays idle unless the user switched the feature on.
+    pub futures: Arc<FuturesHub>,
     pub expanded: AtomicBool,
     /// Bumped on every `WindowEvent::Moved` so a debounced edge snap can tell whether it is
     /// still the most recent move.
@@ -32,6 +39,7 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -79,6 +87,9 @@ pub fn run() {
 
             let fx = FxProvider::new(config.cache_dir.clone());
 
+            let futures_hub = FuturesHub::new(handle.clone(), config.clone());
+            futures_hub.clone().spawn_poll_loop();
+
             app.manage(AppState {
                 config: config.clone(),
                 hub,
@@ -86,6 +97,7 @@ pub fn run() {
                 provider,
                 backup,
                 fx,
+                futures: futures_hub,
                 expanded: AtomicBool::new(false),
                 move_gen: AtomicU64::new(0),
             });
@@ -170,6 +182,22 @@ pub fn run() {
             commands::set_pin,
             commands::toggle_expand,
             commands::collapse_if_unpinned,
+            referral::commands::get_referral_partners,
+            referral::commands::get_referral_profile,
+            referral::commands::set_referral_partner,
+            referral::commands::set_referral_id,
+            referral::commands::set_referral_template,
+            referral::commands::open_referral_url,
+            futures::commands::get_futures_state,
+            futures::commands::get_futures_keys,
+            futures::commands::set_futures_keys,
+            futures::commands::clear_futures_keys,
+            futures::commands::set_futures_enabled,
+            futures::commands::set_futures_venue,
+            futures::commands::set_futures_preferences,
+            futures::commands::refresh_futures,
+            futures::commands::test_futures_connection,
+            futures::commands::open_futures_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

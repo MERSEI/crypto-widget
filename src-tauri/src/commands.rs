@@ -411,9 +411,22 @@ pub fn collapse_if_unpinned_internal(app: &AppHandle, window: &WebviewWindow) {
     if cursor_is_over(app, window) {
         return;
     }
+    // Opening the futures terminal takes focus away from the panel, which is exactly the shape
+    // of a click-away — and collapsing on it would shut the panel the moment its own window
+    // appeared. Focus moving to another window of this app is not the user leaving.
+    if another_window_of_ours_has_focus(app, window) {
+        return;
+    }
     if state.expanded.load(Ordering::SeqCst) {
         apply_expanded(app, window, state.inner(), false);
     }
+}
+
+/// True when one of the app's other windows currently holds focus.
+fn another_window_of_ours_has_focus(app: &AppHandle, window: &WebviewWindow) -> bool {
+    app.webview_windows()
+        .values()
+        .any(|other| other.label() != window.label() && other.is_focused().unwrap_or(false))
 }
 
 /// True when the OS cursor sits inside the window's bounds.

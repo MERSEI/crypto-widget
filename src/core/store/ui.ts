@@ -1,9 +1,15 @@
 import { create } from "zustand";
 import type { ConnectionStatus, FxRate } from "../../types/market";
 
+/** Which panel tab is showing. Deliberately not persisted: the widget's job is to answer
+ *  "where's the market right now" on sight, so it always reopens on the watchlist. */
+export type PanelTab = "watch" | "futures" | "referral";
+
 interface UiState {
   expanded: boolean;
   setExpanded: (expanded: boolean) => void;
+  activeTab: PanelTab;
+  setActiveTab: (tab: PanelTab) => void;
   openSymbol: string | null;
   toggleOpenSymbol: (symbol: string) => void;
   searchOpen: boolean;
@@ -20,6 +26,9 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   expanded: false,
   setExpanded: (expanded) => set({ expanded }),
+
+  activeTab: "watch",
+  setActiveTab: (activeTab) => set({ activeTab }),
 
   openSymbol: null,
   toggleOpenSymbol: (symbol) =>

@@ -13,10 +13,13 @@ import { useSettingsStore } from "../core/store/settings";
 import { useTickersStore } from "../core/store/tickers";
 import { useUiStore } from "../core/store/ui";
 import { useWatchlistStore } from "../core/store/watchlist";
+import { FuturesPanel } from "../features/futures/FuturesPanel";
 import { Pill } from "../features/pill/Pill";
 import { usePillDrag } from "../features/pill/usePillDrag";
+import { ReferralPanel } from "../features/referral/ReferralPanel";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { StatusBar } from "../features/settings/StatusBar";
+import { PanelTabs } from "../features/tabs/PanelTabs";
 import { WatchlistPanel } from "../features/watchlist/WatchlistPanel";
 
 const FX_REFRESH_MS = 6 * 60 * 60 * 1000;
@@ -24,6 +27,7 @@ const FX_REFRESH_MS = 6 * 60 * 60 * 1000;
 export function App() {
   const expanded = useUiStore((s) => s.expanded);
   const setExpanded = useUiStore((s) => s.setExpanded);
+  const activeTab = useUiStore((s) => s.activeTab);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const setConnection = useUiStore((s) => s.setConnection);
@@ -125,8 +129,11 @@ export function App() {
             </button>
           </div>
         </div>
+        <PanelTabs />
         <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <WatchlistPanel />
+          {activeTab === "watch" && <WatchlistPanel />}
+          {activeTab === "futures" && <FuturesPanel />}
+          {activeTab === "referral" && <ReferralPanel />}
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
         </div>
         <StatusBar />

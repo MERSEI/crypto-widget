@@ -1,3 +1,5 @@
+use crate::futures::FuturesSettings;
+use crate::referral::ReferralSettings;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -5,7 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
-pub const SETTINGS_VERSION: u32 = 1;
+/// Bumped to 2 when the futures and referral sections were added. There is no migration step:
+/// both sections are `#[serde(default)]`, so a version-1 file loads as-is and simply gains the
+/// defaults. That is the only safe way to extend this struct — see `load_settings_from`, which
+/// answers a parse failure by backing the file up and starting from scratch. A new *required*
+/// field would therefore wipe every existing user's watchlist, alerts, and window position.
+pub const SETTINGS_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -134,6 +141,10 @@ pub struct AppSettings {
     pub alerts: Vec<Alert>,
     pub notifications: NotificationSettings,
     pub autostart: bool,
+    #[serde(default)]
+    pub futures: FuturesSettings,
+    #[serde(default)]
+    pub referral: ReferralSettings,
 }
 
 impl Default for AppSettings {
@@ -147,6 +158,8 @@ impl Default for AppSettings {
             alerts: Vec::new(),
             notifications: NotificationSettings::default(),
             autostart: false,
+            futures: FuturesSettings::default(),
+            referral: ReferralSettings::default(),
         }
     }
 }
@@ -262,6 +275,48 @@ mod tests {
         assert_eq!(loaded.watchlist[0].symbol, "BTCUSDT");
         assert_eq!(loaded.window.edge, Edge::Left);
         assert!((loaded.window.offset - 0.25).abs() < f64::EPSILON);
+    }
+
+    /// The upgrade path that matters: a settings file written by version 1 has no `futures` and
+    /// no `referral` key at all. It has to load with everything the user cared about intact —
+    /// because the failure mode is not "the new sections are missing", it is `load_settings_from`
+    /// treating the file as corrupt and handing back a blank config with no watchlist and no
+    /// alerts.
+    #[test]
+    fn a_version_1_file_loads_without_losing_anything() {
+        let dir = temp_dir();
+        let v1 = r#"{
+            "version": 1,
+            "window": { "edge": "left", "offset": 0.25, "panelWidth": 380.0, "panelHeight": 520.0, "pinned": true },
+            "display": { "quote": "USDT", "fiat": "CZK", "theme": "terminal-dark" },
+            "chart": { "defaultTimeframe": "1d", "type": "candlestick" },
+            "watchlist": [{ "symbol": "BTCUSDT", "order": 0 }, { "symbol": "GRAMUSDT", "order": 1 }],
+            "alerts": [{
+                "id": "a1", "symbol": "BTCUSDT", "kind": "price_above", "value": 70000.0,
+                "cooldownMin": 15, "once": false, "enabled": true
+            }],
+            "notifications": { "toast": true, "sound": true },
+            "autostart": true
+        }"#;
+        fs::write(dir.join("settings.json"), v1).unwrap();
+
+        let loaded = load_settings_from(&dir);
+
+        assert_eq!(loaded.watchlist.len(), 2, "watchlist must survive the upgrade");
+        assert_eq!(loaded.alerts.len(), 1, "alert rules must survive the upgrade");
+        assert_eq!(loaded.window.edge, Edge::Left);
+        assert!(loaded.window.pinned);
+        assert_eq!(loaded.display.fiat.as_deref(), Some("CZK"));
+        assert!(loaded.autostart);
+
+        // The new sections arrive at their defaults, with the feature switched off.
+        assert!(!loaded.futures.enabled);
+        assert!(loaded.referral.partner.is_none());
+
+        assert!(
+            !dir.join("settings.corrupt.json").exists(),
+            "a version-1 file is valid input, not a corrupt one"
+        );
     }
 
     #[test]

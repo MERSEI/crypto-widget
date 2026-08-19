@@ -1,51 +1,18 @@
 use super::provider::MarketProvider;
+use super::ratelimit::WeightLimiter;
 use super::{Candle, PairInfo, TickerSnapshot};
 use crate::config::cache;
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const BASE_URL: &str = "https://api.binance.com";
-
-/// Simple token bucket: refills `rate` weight/sec, caps at `capacity`.
-/// Guards against a runaway loop hammering Binance and getting the IP banned.
-struct TokenBucket {
-    tokens: f64,
-    capacity: f64,
-    rate_per_sec: f64,
-    last_refill: Instant,
-}
-
-impl TokenBucket {
-    fn new(capacity: f64, rate_per_sec: f64) -> Self {
-        Self {
-            tokens: capacity,
-            capacity,
-            rate_per_sec,
-            last_refill: Instant::now(),
-        }
-    }
-
-    fn try_take(&mut self, cost: f64) -> bool {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
-        self.tokens = (self.tokens + elapsed * self.rate_per_sec).min(self.capacity);
-        self.last_refill = now;
-        if self.tokens >= cost {
-            self.tokens -= cost;
-            true
-        } else {
-            false
-        }
-    }
-}
 
 pub struct BinanceProvider {
     client: reqwest::Client,
     cache_dir: PathBuf,
-    bucket: Mutex<TokenBucket>,
+    limiter: WeightLimiter,
 }
 
 /// Parses Binance's kline response: an array of positional arrays whose first five slots are
@@ -94,16 +61,12 @@ impl BinanceProvider {
                 .expect("reqwest client"),
             cache_dir,
             // 6000 weight/min budget; keep a conservative local cap well under it.
-            bucket: Mutex::new(TokenBucket::new(1200.0, 20.0)),
+            limiter: WeightLimiter::new("spot", 1200.0, 20.0),
         }
     }
 
     fn take_weight(&self, weight: f64) -> Result<(), String> {
-        if self.bucket.lock().unwrap().try_take(weight) {
-            Ok(())
-        } else {
-            Err("local rate limit reached, backing off".into())
-        }
+        self.limiter.take(weight)
     }
 
     async fn fetch_catalog(&self) -> Result<Vec<PairInfo>, String> {

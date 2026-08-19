@@ -165,6 +165,34 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Panel tabs ---------- */
+
+.panel__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.panel-tab {
+  padding: 4px 10px 5px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+  border-bottom: 1px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.panel-tab:hover {
+  color: var(--text-1);
+}
+
+.panel-tab--active {
+  color: var(--text-0);
+  border-bottom-color: var(--accent);
+}
+
 /* ---------- Onboarding ---------- */
 
 .onboarding {
@@ -530,6 +558,327 @@ body {
 
 .settings-panel__label {
   color: var(--text-1);
+}
+
+/* ---------- Futures ---------- */
+
+.futures {
+  padding: 8px 10px 12px;
+  gap: 8px;
+}
+
+.futures__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.futures__toolbar-spacer {
+  flex: 1;
+}
+
+.futures__status {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.futures__status--live { color: var(--up); }
+.futures__status--error { color: var(--danger); }
+.futures__status--connecting,
+.futures__status--nokey { color: var(--warn); }
+
+.futures__testnet-banner {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.futures__account {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-size: 11px;
+}
+
+.futures__account em,
+.position-row__detail em {
+  font-style: normal;
+  color: var(--text-2);
+  margin-right: 4px;
+}
+
+.futures__empty {
+  color: var(--text-2);
+  font-size: 11px;
+  padding: 10px 2px;
+}
+
+.api-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.api-keys__stored {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-1);
+}
+
+.position-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.position-row {
+  padding: 6px 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.position-row__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.position-row__symbol {
+  font-size: 12px;
+  color: var(--text-0);
+}
+
+.position-row__side {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.position-row__side--long {
+  color: var(--up);
+  border: 1px solid color-mix(in srgb, var(--up) 40%, transparent);
+}
+
+.position-row__side--short {
+  color: var(--down);
+  border: 1px solid color-mix(in srgb, var(--down) 40%, transparent);
+}
+
+.position-row__amt,
+.position-row__leverage {
+  font-size: 11px;
+  color: var(--text-1);
+}
+
+.position-row__pnl {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.position-row__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-1);
+}
+
+.position-row__liq {
+  color: var(--warn);
+}
+
+.pos--up { color: var(--up); }
+.pos--down { color: var(--down); }
+
+/* ---------- Futures window (standalone) ---------- */
+
+/* The pill window is transparent; this one is a normal decorated window and paints its own
+   background, or the native frame shows through white behind the panel. */
+.futures-window {
+  height: 100%;
+  width: 100%;
+  background: var(--bg-0);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+}
+
+.futures-window__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.futures-window__readonly {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.futures-window__updated {
+  font-size: 10px;
+  color: var(--text-2);
+}
+
+.futures-window__setup {
+  max-width: 460px;
+}
+
+.futures-window__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.futures-window__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.futures-window__stat-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.futures-window__stat-value {
+  font-size: 15px;
+}
+
+.futures-window__section-title {
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+  margin: 0 0 6px;
+}
+
+.position-table--full .position-row__detail {
+  font-size: 11px;
+  gap: 2px 18px;
+}
+
+/* ---------- Referral ---------- */
+
+.referral-panel {
+  padding: 8px 10px 12px;
+  gap: 8px;
+}
+
+.referral-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.referral-panel__field label {
+  color: var(--text-1);
+  font-size: 11px;
+}
+
+.referral-panel__field input {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: var(--text-0);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.referral-panel__field input:focus {
+  border-color: var(--accent);
+}
+
+.referral-panel__disclosure {
+  align-self: flex-start;
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 0;
+}
+
+.referral-panel__disclosure:hover {
+  color: var(--text-1);
+}
+
+.referral-panel__error {
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 1.4;
+  border-left: 2px solid var(--warn);
+  padding-left: 8px;
+}
+
+.referral-panel__dashboard {
+  align-self: flex-start;
+  color: var(--accent);
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.referral-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.referral-link__url {
+  font-size: 11px;
+  color: var(--text-0);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.referral-link__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.referral-link__qr {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.qr-code {
+  border-radius: 3px;
 }
 
 .settings-panel__hint {

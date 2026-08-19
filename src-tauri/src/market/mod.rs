@@ -4,6 +4,7 @@ pub mod binance_ws;
 pub mod fx;
 pub mod hub;
 pub mod provider;
+pub mod ratelimit;
 
 use serde::{Deserialize, Serialize};
 

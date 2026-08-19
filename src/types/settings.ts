@@ -48,6 +48,24 @@ export interface NotificationSettings {
   sound: boolean;
 }
 
+export type VenueMode = "mainnet" | "testnet";
+
+/** Non-secret half of the futures feature. API keys live in the OS credential store and never
+ *  reach the renderer — mirrors `src-tauri/src/futures/mod.rs`. */
+export interface FuturesSettings {
+  enabled: boolean;
+  mode: VenueMode;
+  defaultLeverage: number;
+  confirmOrders: boolean;
+}
+
+/** Mirrors `src-tauri/src/referral/mod.rs`. `ids` is keyed by partner id, so switching the
+ *  dropdown doesn't discard the other partners' affiliate IDs. */
+export interface ReferralSettings {
+  partner: string | null;
+  ids: Record<string, string>;
+}
+
 export interface AppSettings {
   version: number;
   window: WindowSettings;
@@ -57,4 +75,6 @@ export interface AppSettings {
   alerts: Alert[];
   notifications: NotificationSettings;
   autostart: boolean;
+  futures: FuturesSettings;
+  referral: ReferralSettings;
 }
