@@ -18,7 +18,7 @@ use market::fx::FxProvider;
 use market::hub::MarketHub;
 use market::provider::MarketProvider;
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 pub struct AppState {
@@ -35,6 +35,10 @@ pub struct AppState {
     /// Bumped on every `WindowEvent::Moved` so a debounced edge snap can tell whether it is
     /// still the most recent move.
     pub move_gen: AtomicU64,
+    /// Serialises every caller that resizes/repositions the main window (expand, collapse,
+    /// edge-snap) so two of them can never interleave their `outer_size()` reads and `set_size`
+    /// calls — see `commands::apply_expanded`.
+    pub geometry_lock: Mutex<()>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -101,6 +105,7 @@ pub fn run() {
                 futures: futures_hub,
                 expanded: AtomicBool::new(false),
                 move_gen: AtomicU64::new(0),
+                geometry_lock: Mutex::new(()),
             });
 
             if let Some(main_window) = app.get_webview_window("main") {

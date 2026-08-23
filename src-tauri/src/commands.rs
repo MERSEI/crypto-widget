@@ -283,10 +283,11 @@ fn snap_to_edge(window: &WebviewWindow, state: &AppState) {
     state.config.mark_dirty();
 
     let settings = state.config.snapshot();
+    let _guard = state.geometry_lock.lock().unwrap();
     if state.expanded.load(Ordering::SeqCst) {
-        window::apply_panel_geometry(window, &settings.window);
+        window::snap_panel_geometry(window, &settings.window);
     } else {
-        window::apply_pill_geometry(window, &settings.window);
+        window::snap_pill_geometry(window, &settings.window);
     }
 }
 
@@ -345,7 +346,14 @@ pub async fn collapse_if_unpinned(window: WebviewWindow, state: State<'_, AppSta
 /// state, so every path that changes it — pill click, tray click, blur autocollapse — has to
 /// emit `expanded`; otherwise the window resizes but React keeps rendering the other layout
 /// (panel content squeezed into a 28px pill, or a pill floating in a 380px window).
+///
+/// Serialised on `state.geometry_lock` against `snap_to_edge`/every other caller of this
+/// function: a click-to-expand landing mid-flight of a blur-triggered collapse (or vice versa)
+/// used to let two geometry mutations run concurrently, so whichever `set_size` applied last to
+/// the OS window did not necessarily match the last `state.expanded` write the renderer saw —
+/// content and frame could end up on different sides of the toggle.
 fn apply_expanded(app: &AppHandle, window: &WebviewWindow, state: &AppState, expanded: bool) {
+    let _guard = state.geometry_lock.lock().unwrap();
     state.expanded.store(expanded, Ordering::SeqCst);
     let settings = state.config.snapshot();
     if expanded {

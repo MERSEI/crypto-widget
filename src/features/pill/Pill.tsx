@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { formatPercent } from "../../core/format/percent";
 import { useWatchlistStore } from "../../core/store/watchlist";
 import { useTickersStore } from "../../core/store/tickers";
@@ -11,8 +12,19 @@ export function Pill() {
   const topTicker = useTickersStore((s) => (topSymbol ? s.bySymbol[topSymbol] : undefined));
   const connectionState = useUiStore((s) => s.connection.state);
 
+  // A second click landing before the first `toggleExpand()` resolves used to fire a second,
+  // overlapping resize on the Rust side. The lock there now makes that safe, but there is still
+  // no reason to send it — the in-flight request already carries whatever the latest click meant.
+  const toggling = useRef(false);
   const handleClick = () => {
-    void commands.toggleExpand().then((expanded) => useUiStore.getState().setExpanded(expanded));
+    if (toggling.current) return;
+    toggling.current = true;
+    void commands
+      .toggleExpand()
+      .then((expanded) => useUiStore.getState().setExpanded(expanded))
+      .finally(() => {
+        toggling.current = false;
+      });
   };
   const { onPointerDown } = usePillDrag(handleClick);
 

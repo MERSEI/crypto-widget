@@ -50,14 +50,35 @@ pub fn geometry_for(edge: Edge, offset: f64, area: &Rect, size: (f64, f64)) -> (
     }
 }
 
-/// Docks the window to `settings.edge`, but only when it isn't already there. The no-op guard
-/// matters because the edge snap is driven by `WindowEvent::Moved`: repositioning the window
-/// emits another `Moved`, so an unconditional apply would keep re-triggering itself forever.
+fn geometry_target(window: &WebviewWindow, settings: &WindowSettings, size: (f64, f64)) -> Option<(f64, f64, f64, f64)> {
+    let area = work_area(window)?;
+    Some(geometry_for(settings.edge, settings.offset, &area, size))
+}
+
+/// Unconditionally sets the window's size and position. Used for every geometry change whose
+/// caller already knows it wants a real resize — expand/collapse and the one-shot snap at the
+/// end of a drag — as opposed to [`apply_geometry_if_unsettled`], whose skip-if-already-there
+/// guard exists for a narrower, self-triggering case (see its doc comment). Skipping here on a
+/// stale `outer_size()`/`outer_position()` reading silently dropped the resize entirely — the
+/// window stayed pill-sized while the renderer had already painted the full panel, fixable only
+/// by a restart, because nothing else would ever call this again to retry it.
 fn apply_geometry(window: &WebviewWindow, settings: &WindowSettings, size: (f64, f64)) {
-    let Some(area) = work_area(window) else {
+    let Some((x, y, w, h)) = geometry_target(window, settings, size) else {
         return;
     };
-    let (x, y, w, h) = geometry_for(settings.edge, settings.offset, &area, size);
+    let _ = window.set_size(LogicalSize::new(w, h));
+    let _ = window.set_position(LogicalPosition::new(x, y));
+}
+
+/// Docks the window to `settings.edge`, but only when it isn't already there. The no-op guard
+/// matters here specifically because this path is driven by `WindowEvent::Moved`: repositioning
+/// the window emits another `Moved`, so an unconditional apply would keep re-triggering itself
+/// forever. Only `snap_to_edge` (the post-drag re-dock) should use this — anything that isn't
+/// itself reacting to a `Moved` event should call [`apply_geometry`] instead.
+fn apply_geometry_if_unsettled(window: &WebviewWindow, settings: &WindowSettings, size: (f64, f64)) {
+    let Some((x, y, w, h)) = geometry_target(window, settings, size) else {
+        return;
+    };
 
     if let (Ok(pos), Ok(scale), Ok(current)) = (
         window.outer_position(),
@@ -85,6 +106,20 @@ pub fn apply_pill_geometry(window: &WebviewWindow, settings: &WindowSettings) {
 
 pub fn apply_panel_geometry(window: &WebviewWindow, settings: &WindowSettings) {
     apply_geometry(
+        window,
+        settings,
+        (settings.panel_width, settings.panel_height),
+    );
+}
+
+/// Re-docks to `settings.edge` unless the window is already there — see
+/// [`apply_geometry_if_unsettled`]. Only for use from the `Moved`-driven edge-snap.
+pub fn snap_pill_geometry(window: &WebviewWindow, settings: &WindowSettings) {
+    apply_geometry_if_unsettled(window, settings, (PILL_WIDTH, PILL_HEIGHT));
+}
+
+pub fn snap_panel_geometry(window: &WebviewWindow, settings: &WindowSettings) {
+    apply_geometry_if_unsettled(
         window,
         settings,
         (settings.panel_width, settings.panel_height),
