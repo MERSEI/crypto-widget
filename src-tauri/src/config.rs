@@ -148,6 +148,10 @@ pub struct AppSettings {
     pub referral: ReferralSettings,
     #[serde(default)]
     pub wallet: WalletSettings,
+    /// Which watchlist symbol the pill shows, chosen explicitly rather than always the first
+    /// row. `None` falls back to the first watchlist item, same as before this existed.
+    #[serde(default, rename = "pinnedSymbol")]
+    pub pinned_symbol: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -164,6 +168,7 @@ impl Default for AppSettings {
             futures: FuturesSettings::default(),
             referral: ReferralSettings::default(),
             wallet: WalletSettings::default(),
+            pinned_symbol: None,
         }
     }
 }
@@ -321,6 +326,22 @@ mod tests {
             !dir.join("settings.corrupt.json").exists(),
             "a version-1 file is valid input, not a corrupt one"
         );
+        assert!(loaded.pinned_symbol.is_none(), "a file predating the pin feature has nothing pinned");
+    }
+
+    #[test]
+    fn pinned_symbol_round_trips_through_json() {
+        let dir = temp_dir();
+        let settings = AppSettings {
+            pinned_symbol: Some("ETHUSDT".into()),
+            ..AppSettings::default()
+        };
+
+        let path = dir.join("settings.json");
+        fs::write(&path, serde_json::to_string_pretty(&settings).unwrap()).unwrap();
+
+        let loaded = load_settings_from(&dir);
+        assert_eq!(loaded.pinned_symbol.as_deref(), Some("ETHUSDT"));
     }
 
     #[test]

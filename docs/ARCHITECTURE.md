@@ -163,8 +163,13 @@ serve a detector that never looks past its own window.
   making it resolution- and DPI-independent. `edge_offset_from_position` recomputes it after every
   manual drag.
 - Edge snapping is driven by `WindowEvent::Moved` and debounced through the `move_gen` counter;
-  the apply step is a no-op when the window is already docked, because repositioning emits another
-  `Moved` and an unconditional apply would loop forever.
+  the apply step (`snap_pill/panel_geometry`) is a no-op when the window is already docked,
+  because repositioning emits another `Moved` and an unconditional apply would loop forever.
+- Expand/collapse (`apply_pill/panel_geometry`) always calls `set_size`/`set_position`, unlike the
+  edge-snap path above — skipping it on a stale `outer_size()` reading used to silently drop the
+  resize, leaving the window pill-sized while the renderer had already painted the panel, fixable
+  only by a restart. `AppState.geometry_lock` serialises every caller of either path (pill click,
+  tray, blur autocollapse, drag-end snap) so two can't interleave their reads and writes.
 - Expanding swaps pill geometry for panel geometry (`panelWidth × panelHeight`, default 380×520)
   against the same edge anchor.
 - Blur auto-collapse re-checks focus after 220ms before acting: WebView2 briefly drops window
@@ -228,7 +233,7 @@ type-safely in `src/core/ipc/commands.ts`. Reads first, then mutations, then win
 | ---------------------------------------- | ---------------------------------------------- |
 | `get_settings` / `get_tickers` / `get_connection` / `get_expanded` | Initial hydration     |
 | `search_pairs` / `get_klines` / `get_fx_rate`                      | On-demand market data |
-| `add_watchlist_symbol` / `remove_watchlist_symbol` / `reorder_watchlist` | Watchlist       |
+| `add_watchlist_symbol` / `remove_watchlist_symbol` / `reorder_watchlist` / `set_pinned_symbol` | Watchlist |
 | `set_display` / `set_chart_settings` / `set_notifications` / `set_autostart` | Settings   |
 | `upsert_alert` / `delete_alert`          | Alert rules                                    |
 | `start_drag` / `drag_ended` / `set_pin` / `toggle_expand` / `collapse_if_unpinned` | Window |
@@ -259,6 +264,9 @@ Zustand, one store per concern, no global god-object:
 
 - `tickers` — the price map, replaced wholesale on each `tickers` event
 - `watchlist` — ordered symbols, optimistic on drag, authoritative from settings
+- `settings.pinnedSymbol` — which symbol the pill shows; `null` falls back to the first watchlist
+  row (by `order`). Set from the ★ button on a watchlist row; cleared automatically if that
+  symbol is removed from the watchlist.
 - `alerts` — rule list, refreshed from the `alerts` event
 - `settings` — the mirrored `AppSettings`
 - `ui` — expanded/settings-open flags, connection status, FX rate

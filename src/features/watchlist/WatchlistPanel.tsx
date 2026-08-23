@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSettingsStore } from "../../core/store/settings";
 import { useUiStore } from "../../core/store/ui";
 import { useWatchlistStore } from "../../core/store/watchlist";
 import { ChartAccordion } from "../chart/ChartAccordion";
@@ -9,6 +10,8 @@ import { TickerRow } from "./TickerRow";
 export function WatchlistPanel() {
   const items = useWatchlistStore((s) => s.items);
   const remove = useWatchlistStore((s) => s.remove);
+  const pinnedSymbol = useSettingsStore((s) => s.settings?.pinnedSymbol ?? null);
+  const setPinnedSymbol = useSettingsStore((s) => s.setPinnedSymbol);
   const openSymbol = useUiStore((s) => s.openSymbol);
   const toggleOpenSymbol = useUiStore((s) => s.toggleOpenSymbol);
   const searchOpen = useUiStore((s) => s.searchOpen);
@@ -36,9 +39,11 @@ export function WatchlistPanel() {
           <div key={item.symbol}>
             <TickerRow
               symbol={item.symbol}
+              isPinned={pinnedSymbol === item.symbol}
               onToggle={() => toggleOpenSymbol(item.symbol)}
               onRemove={() => void remove(item.symbol)}
               onEditAlert={() => setAlertSymbol(item.symbol)}
+              onTogglePin={() => void setPinnedSymbol(pinnedSymbol === item.symbol ? null : item.symbol)}
             />
             {openSymbol === item.symbol && <ChartAccordion symbol={item.symbol} />}
           </div>

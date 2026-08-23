@@ -79,4 +79,6 @@ export interface AppSettings {
   futures: FuturesSettings;
   referral: ReferralSettings;
   wallet: WalletSettings;
+  /** Which watchlist symbol the pill shows. `null` falls back to the first watchlist row. */
+  pinnedSymbol: string | null;
 }

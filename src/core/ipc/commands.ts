@@ -23,6 +23,7 @@ export const commands = {
   addWatchlistSymbol: (symbol: string) => invoke<void>("add_watchlist_symbol", { symbol }),
   removeWatchlistSymbol: (symbol: string) => invoke<void>("remove_watchlist_symbol", { symbol }),
   reorderWatchlist: (symbols: string[]) => invoke<void>("reorder_watchlist", { symbols }),
+  setPinnedSymbol: (symbol: string | null) => invoke<void>("set_pinned_symbol", { symbol }),
 
   setDisplay: (quote: string, fiat: string | null) => invoke<void>("set_display", { quote, fiat }),
   setChartSettings: (defaultTimeframe: string, kind: string) =>

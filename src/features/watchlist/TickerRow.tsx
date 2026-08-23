@@ -10,9 +10,11 @@ import { STALE_AFTER_MS, type TickerSnapshot } from "../../types/market";
 
 interface Props {
   symbol: string;
+  isPinned: boolean;
   onToggle: () => void;
   onRemove: () => void;
   onEditAlert: () => void;
+  onTogglePin: () => void;
 }
 
 function displayPrice(ticker: TickerSnapshot | undefined, fiat: string | null, rate: number | null): string {
@@ -21,7 +23,7 @@ function displayPrice(ticker: TickerSnapshot | undefined, fiat: string | null, r
   return formatPrice(ticker.price);
 }
 
-export function TickerRow({ symbol, onToggle, onRemove, onEditAlert }: Props) {
+export function TickerRow({ symbol, isPinned, onToggle, onRemove, onEditAlert, onTogglePin }: Props) {
   const ticker = useTickersStore((s) => s.bySymbol[symbol]);
   const fiat = useSettingsStore((s) => s.settings?.display.fiat ?? null);
   const fxRate = useUiStore((s) => s.fxRate?.rate ?? null);
@@ -78,6 +80,13 @@ export function TickerRow({ symbol, onToggle, onRemove, onEditAlert }: Props) {
         {hasAlert && <span className="ticker-row__alert-dot" />}
       </div>
       <div className="ticker-row__actions">
+        <button
+          className={`icon-btn ${isPinned ? "icon-btn--active" : ""}`}
+          title={isPinned ? "Unpin from pill" : "Show this in the pill"}
+          onClick={onTogglePin}
+        >
+          {isPinned ? "★" : "☆"}
+        </button>
         <button className="icon-btn" title="Alert" onClick={onEditAlert}>
           🔔
         </button>

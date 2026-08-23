@@ -10,6 +10,7 @@ interface SettingsState {
   setChart: (chart: ChartSettings) => Promise<void>;
   setNotifications: (toast: boolean, sound: boolean) => Promise<void>;
   setAutostart: (enabled: boolean) => Promise<void>;
+  setPinnedSymbol: (symbol: string | null) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -39,5 +40,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     await commands.setAutostart(enabled);
     const current = get().settings;
     if (current) set({ settings: { ...current, autostart: enabled } });
+  },
+
+  setPinnedSymbol: async (symbol) => {
+    await commands.setPinnedSymbol(symbol);
+    const current = get().settings;
+    if (current) set({ settings: { ...current, pinnedSymbol: symbol } });
   },
 }));

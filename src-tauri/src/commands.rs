@@ -103,9 +103,27 @@ pub async fn remove_watchlist_symbol(state: State<'_, AppState>, symbol: String)
         for (i, item) in settings.watchlist.iter_mut().enumerate() {
             item.order = i as u32;
         }
+        // A pin pointing at a symbol that no longer exists would leave the pill showing a price
+        // that never updates again — fall back to the first watchlist row, same as no pin at all.
+        if settings.pinned_symbol.as_deref() == Some(symbol.as_str()) {
+            settings.pinned_symbol = None;
+        }
     }
     state.config.mark_dirty();
     sync_ws_symbols(&state);
+    Ok(())
+}
+
+/// Which watchlist symbol the pill shows. `None` clears the pin and falls back to the first
+/// watchlist row (by `order`), same as before this existed.
+#[tauri::command]
+pub async fn set_pinned_symbol(state: State<'_, AppState>, symbol: Option<String>) -> Result<(), String> {
+    let symbol = symbol.map(|s| s.to_uppercase());
+    {
+        let mut settings = state.config.settings.write().unwrap();
+        settings.pinned_symbol = symbol;
+    }
+    state.config.mark_dirty();
     Ok(())
 }
 

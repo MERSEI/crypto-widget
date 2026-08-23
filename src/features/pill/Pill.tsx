@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { formatPercent } from "../../core/format/percent";
 import { useWatchlistStore } from "../../core/store/watchlist";
+import { useSettingsStore } from "../../core/store/settings";
 import { useTickersStore } from "../../core/store/tickers";
 import { useUiStore } from "../../core/store/ui";
 import { commands } from "../../core/ipc/commands";
@@ -8,7 +9,10 @@ import { usePillDrag } from "./usePillDrag";
 
 export function Pill() {
   const items = useWatchlistStore((s) => s.items);
-  const topSymbol = items[0]?.symbol;
+  const pinnedSymbol = useSettingsStore((s) => s.settings?.pinnedSymbol ?? null);
+  // A pin only applies while its symbol is still on the watchlist — the backend clears a
+  // dangling one on removal, but this guards the brief window before that update lands here.
+  const topSymbol = (pinnedSymbol && items.some((i) => i.symbol === pinnedSymbol) ? pinnedSymbol : items[0]?.symbol);
   const topTicker = useTickersStore((s) => (topSymbol ? s.bySymbol[topSymbol] : undefined));
   const connectionState = useUiStore((s) => s.connection.state);
 

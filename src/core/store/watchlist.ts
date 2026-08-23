@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { commands } from "../ipc/commands";
+import { useSettingsStore } from "./settings";
 import type { WatchlistItem } from "../../types/settings";
 
 interface WatchlistState {
@@ -31,6 +32,13 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
         .filter((item) => item.symbol !== symbol)
         .map((item, order) => ({ ...item, order })),
     }));
+    // The backend clears a pin pointing at a removed symbol as part of the same mutation
+    // (see remove_watchlist_symbol); mirror that locally instead of waiting for a settings
+    // refetch, or the pill would keep trying to show a symbol that no longer exists.
+    const settings = useSettingsStore.getState().settings;
+    if (settings?.pinnedSymbol === symbol) {
+      useSettingsStore.setState({ settings: { ...settings, pinnedSymbol: null } });
+    }
   },
 
   reorder: async (symbols) => {

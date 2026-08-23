@@ -183,6 +183,7 @@ pub fn run() {
             commands::add_watchlist_symbol,
             commands::remove_watchlist_symbol,
             commands::reorder_watchlist,
+            commands::set_pinned_symbol,
             commands::set_display,
             commands::set_chart_settings,
             commands::upsert_alert,
