@@ -18,11 +18,12 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .map(|state| state.config.snapshot().window.pinned)
         .unwrap_or(false);
 
+    let wallet_item = MenuItem::with_id(app, "wallet", "Wallet", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let pin_item = MenuItem::with_id(app, "pin", pin_label(pinned_now), true, None::<&str>)?;
     let test_item = MenuItem::with_id(app, "test-notification", "Test notification", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&settings_item, &pin_item, &test_item, &quit_item])?;
+    let menu = Menu::with_items(app, &[&wallet_item, &settings_item, &pin_item, &test_item, &quit_item])?;
 
     let icon = app
         .default_window_icon()
@@ -43,6 +44,16 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
                     state.config.flush_if_dirty();
                 }
                 app.exit(0);
+            }
+            "wallet" => {
+                // The wallet lives in its own window, so it is reachable even while the pill is
+                // collapsed — which is most of the time.
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = crate::wallet::commands::open_wallet_window(app).await {
+                        eprintln!("wallet window: {e}");
+                    }
+                });
             }
             "settings" => {
                 // The renderer only mounts the settings pane inside the expanded layout, so a
@@ -75,6 +86,22 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
             } = event
             {
                 let app = tray.app_handle();
+                // With the pill switched off there is nothing for a left click to expand, and
+                // showing it anyway would undo the setting. The wallet is what the icon means
+                // then.
+                let pill_enabled = app
+                    .try_state::<AppState>()
+                    .map(|state| state.config.snapshot().wallet.widget_enabled)
+                    .unwrap_or(true);
+                if !pill_enabled {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = crate::wallet::commands::open_wallet_window(app).await {
+                            eprintln!("wallet window: {e}");
+                        }
+                    });
+                    return;
+                }
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                 }

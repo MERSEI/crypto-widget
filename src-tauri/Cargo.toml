@@ -37,4 +37,5 @@ tauri-plugin-opener = "2"
 hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
+alloy = { version = "2.4.1", default-features = false, features = ["provider-http", "signer-local", "signer-mnemonic", "contract", "sol-types", "network", "rpc-types-eth", "reqwest-rustls-tls", "std"] }
 

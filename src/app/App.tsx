@@ -117,6 +117,13 @@ export function App() {
             >
               📌
             </button>
+            <button
+              className="icon-btn"
+              title="Open the wallet"
+              onClick={() => void commands.openWalletWindow()}
+            >
+              👛
+            </button>
             <button className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
               ⚙
             </button>

@@ -1,4 +1,5 @@
 import type { ChartType, Timeframe } from "./market";
+import type { WalletSettings } from "./wallet";
 
 export type Edge = "right" | "left" | "top" | "bottom";
 
@@ -77,4 +78,5 @@ export interface AppSettings {
   autostart: boolean;
   futures: FuturesSettings;
   referral: ReferralSettings;
+  wallet: WalletSettings;
 }

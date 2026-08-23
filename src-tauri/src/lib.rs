@@ -6,6 +6,7 @@ mod market;
 mod referral;
 mod secrets;
 mod tray;
+mod wallet;
 mod window;
 
 use config::ConfigState;
@@ -114,7 +115,14 @@ pub fn run() {
                 // A docked widget is useless behind other windows, so always-on-top is
                 // unconditional; `pinned` only governs whether blur auto-collapses the panel.
                 let _ = main_window.set_always_on_top(true);
-                let _ = main_window.show();
+                // The pill is opt-out now that the wallet is a window of its own: someone who
+                // turned it off must not find it docked to their screen edge again after every
+                // restart. The tray icon still reaches both.
+                if settings.wallet.widget_enabled {
+                    let _ = main_window.show();
+                } else {
+                    let _ = main_window.hide();
+                }
 
                 let event_window = main_window.clone();
                 let event_app = handle.clone();
@@ -198,6 +206,23 @@ pub fn run() {
             futures::commands::refresh_futures,
             futures::commands::test_futures_connection,
             futures::commands::open_futures_window,
+            wallet::commands::get_wallet_state,
+            wallet::commands::create_wallet,
+            wallet::commands::import_wallet,
+            wallet::commands::reveal_seed_phrase,
+            wallet::commands::forget_wallet,
+            wallet::commands::set_wallet_account,
+            wallet::commands::set_wallet_network,
+            wallet::commands::set_wallet_widget_enabled,
+            wallet::commands::add_wallet_token,
+            wallet::commands::remove_wallet_token,
+            wallet::commands::get_wallet_balances,
+            wallet::commands::get_wallet_history,
+            wallet::commands::set_etherscan_key,
+            wallet::commands::clear_etherscan_key,
+            wallet::commands::quote_wallet_transfer,
+            wallet::commands::send_wallet_transfer,
+            wallet::commands::open_wallet_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

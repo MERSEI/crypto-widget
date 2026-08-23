@@ -73,6 +73,24 @@ pub fn load(namespace: &str) -> Option<Credential> {
     })
 }
 
+/// Stores a single opaque string — the wallet seed phrase, which has no key/secret shape to it.
+///
+/// Deliberately a separate pair of functions rather than a `Credential` with an empty half: the
+/// two formats must never be confused, because `load` on a raw entry would fail to parse and
+/// report "no credential stored" for a seed that is very much stored.
+pub fn save_raw(namespace: &str, value: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Err("nothing to store".into());
+    }
+    entry(namespace)?
+        .set_password(value.trim())
+        .map_err(|e| format!("could not store the secret: {e}"))
+}
+
+pub fn load_raw(namespace: &str) -> Option<String> {
+    entry(namespace).ok()?.get_password().ok()
+}
+
 /// Removes a credential. Deleting one that was never there is a success, not a failure — the
 /// caller asked for it to be gone, and it is.
 pub fn delete(namespace: &str) -> Result<(), String> {
@@ -88,6 +106,21 @@ pub fn status(namespace: &str) -> CredentialStatus {
         Some(credential) => CredentialStatus {
             present: true,
             masked_key: Some(mask(&credential.key)),
+        },
+        None => CredentialStatus::default(),
+    }
+}
+
+/// Same, for a secret stored with `save_raw` — an Etherscan key, not a key/secret pair.
+///
+/// `status` would report `present: false` for one of these: it parses the stored value as JSON
+/// and a raw string is not that. Reporting "no key configured" for a key that is very much
+/// configured is the exact confusion `save_raw` exists to avoid.
+pub fn status_raw(namespace: &str) -> CredentialStatus {
+    match load_raw(namespace) {
+        Some(value) => CredentialStatus {
+            present: true,
+            masked_key: Some(mask(&value)),
         },
         None => CredentialStatus::default(),
     }

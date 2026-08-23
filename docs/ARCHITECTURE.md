@@ -163,13 +163,48 @@ serve a detector that never looks past its own window.
   entirely; always-on-top is unconditional.
 - Work area is approximated by the monitor's full bounds — see the README's limitations.
 
+## Wallet
+
+`src-tauri/src/wallet/` is the only part of the app that can spend money, so the split that is
+merely tidy elsewhere is load-bearing here: **the seed phrase never crosses the IPC boundary.**
+A compromised or simply buggy renderer can ask for a transfer; it cannot sign one.
+
+- `keystore.rs` — BIP-39 phrase, BIP-44 derivation at `m/44'/60'/0'/0/index`, stored in the OS
+  credential store under its own namespace. The path is pinned to the one MetaMask and every
+  hardware wallet use: anything else produces addresses the user's written-down phrase does not
+  restore anywhere else. A phrase is checksum-validated before it is stored, because one swapped
+  word still opens a perfectly real, permanently empty wallet.
+- `chain.rs` — balances, fee quotes and the send path, over alloy. Amounts cross IPC as **strings**
+  (a wei-scaled balance does not survive a JS `number`), and token decimals are always read from
+  the contract rather than from settings.
+- `etherscan.rs` — history over the v2 API. `status: "0"` means either "no transactions" or a real
+  failure, and the two are told apart by message; flattening both into `[]` made a rejected key
+  look like a brand-new wallet.
+- `commands.rs` — the IPC surface, and the three checks that stand between a request and a
+  broadcast: the destination is checksum-verified and refused if it is the zero address or the
+  token's own contract, the amount is parsed against the asset's real decimals, and the fee the
+  user approved is re-quoted before signing.
+
+Sending is deliberately **two commands**. `quote_wallet_transfer` prices the exact transaction
+`send_wallet_transfer` will rebuild; the renderer hands back the approved `maxCostWei`, and a
+re-quote more than 25% above it is refused rather than signed. Gas moves between the dialog and
+the click — an exact match would refuse honest transfers, and no check at all would let a spike
+turn a two-dollar fee into a fifty-dollar one.
+
+The wallet has its own window (`index.html?window=wallet`), like the futures terminal: the pill is
+140×30, transparent and undecorated, which suits neither a balance table nor an address someone
+has to read character by character. `wallet.widgetEnabled` makes the pill itself optional — with
+it off, the tray icon opens the wallet instead of expanding a pill that is not there.
+
 ## Persistence
 
 `ConfigState` loads `settings.json` from the Tauri app config dir on startup, keeps it behind an
 `RwLock`, and a background task flushes it **at most twice a second** when dirty. Commands mutate
 the struct and call `mark_dirty()` — no command writes to disk synchronously.
 
-- Schema is versioned (`SETTINGS_VERSION = 1`); the Rust structs are `camelCase`-serialized and
+- Schema is versioned (`SETTINGS_VERSION = 3`; every added section is `#[serde(default)]`, so an
+  older file gains defaults instead of failing to parse — a parse failure backs the file up and
+  starts over, taking the watchlist and alerts with it); the Rust structs are `camelCase`-serialized and
   mirrored by `src/types/settings.ts`. **Changing one means changing the other.**
 - A corrupt file is *backed up*, not deleted, and the app starts from defaults.
 - `cache/` holds TTL envelopes (`saved_at` + value) for the catalog, FX rate, and last tickers.
@@ -187,6 +222,12 @@ type-safely in `src/core/ipc/commands.ts`. Reads first, then mutations, then win
 | `set_display` / `set_chart_settings` / `set_notifications` / `set_autostart` | Settings   |
 | `upsert_alert` / `delete_alert`          | Alert rules                                    |
 | `start_drag` / `drag_ended` / `set_pin` / `toggle_expand` / `collapse_if_unpinned` | Window |
+| `get_wallet_state` / `get_wallet_balances` / `get_wallet_history` | Wallet reads             |
+| `create_wallet` / `import_wallet` / `reveal_seed_phrase` / `forget_wallet` | Seed lifecycle   |
+| `set_wallet_account` / `set_wallet_network` / `set_wallet_widget_enabled` | Wallet settings   |
+| `add_wallet_token` / `remove_wallet_token` / `set_etherscan_key` / `clear_etherscan_key` | Wallet setup |
+| `quote_wallet_transfer` / `send_wallet_transfer` | Transfer, reviewed then confirmed           |
+| `open_wallet_window` / `open_futures_window`     | Secondary windows                           |
 
 Events flow the other way (`src/core/ipc/events.ts`):
 
@@ -211,6 +252,9 @@ Zustand, one store per concern, no global god-object:
 - `alerts` — rule list, refreshed from the `alerts` event
 - `settings` — the mirrored `AppSettings`
 - `ui` — expanded/settings-open flags, connection status, FX rate
+- `wallet` — wallet state, balances and history, each with its own loading/error slice: history
+  needs an Etherscan key and balances do not, so a rate-limited history must not blank out
+  balances that loaded fine
 
 `features/` holds the visual units (pill + drag hook, watchlist rows and search dialog, chart
 accordion with timeframe bar, alert editor and list, settings panel and status bar). `core/format/`

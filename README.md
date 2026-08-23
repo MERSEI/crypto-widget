@@ -33,9 +33,22 @@ in half a second without switching windows.
   screen — the panel never blanks out.
 - **Optional fiat column.** USDT→CZK conversion from a cached FX endpoint with a primary/fallback
   pair and a 6h TTL.
-- **Tray integration.** Show/hide, pin, settings, and quit from the system tray.
+- **Futures positions.** Optional, off by default: a read-only mirror of an exchange futures
+  account — wallet and margin balance, open positions, unrealised PnL and ROE, all computed in
+  Rust so the panel and the backend cannot disagree. Orders are only ever sent to the testnet.
+- **Wallet.** An Ethereum wallet in its own window: balances for ETH and any ERC-20 you add,
+  transaction history, and transfers behind a review-then-confirm step. Keys are derived from a
+  BIP-39 phrase at the standard BIP-44 path and stored in the Windows Credential Manager — the
+  phrase never reaches the interface except when you ask to see it for a backup, and signing
+  happens entirely in Rust. Token decimals are read from the contract, amounts never touch a JS
+  `number`, and a fee that has run away from the one you approved is refused rather than signed.
+- **Referral links.** Partner affiliate links built from your own IDs, with a QR code.
+- **Tray integration.** Show/hide, pin, wallet, settings, and quit from the system tray.
 
-No API keys, no accounts, no telemetry — every endpoint the app touches is public.
+No telemetry, and no account is needed for anything the widget shows by default — the market data
+endpoints are all public. The optional features (futures, wallet, Etherscan history) take
+credentials, and those live in the Windows Credential Manager, never in `settings.json` and never
+in the renderer.
 
 ## Stack
 
@@ -119,12 +132,16 @@ src/                      React renderer
   app/                    App shell, error boundary, theme
   core/format/            Price / percent / volume formatting
   core/ipc/               Typed wrappers over Tauri invoke + event listeners
-  core/store/             Zustand stores (tickers, watchlist, alerts, settings, ui)
-  features/               Pill, watchlist, chart, alerts, settings panels
-  types/                  Shared market + settings types (mirror the Rust structs)
+  core/store/             Zustand stores (tickers, watchlist, alerts, settings, ui, wallet)
+  features/               Pill, watchlist, chart, alerts, settings, futures, referral, wallet
+  types/                  Shared market + settings + wallet types (mirror the Rust structs)
 src-tauri/src/            Rust backend
   market/                 Binance WS client, REST provider, FX provider, market hub
   alerts/                 Spike detector + alert engine
+  futures/                Signed exchange client, account hub, futures commands
+  referral/               Partner catalogue and link building
+  wallet/                 Keystore (BIP-39/44), chain client, Etherscan history, commands
+  secrets.rs              OS credential store — the only place a secret is written
   commands.rs             Every #[tauri::command] exposed to the renderer
   config.rs               Settings schema, load/save, TTL cache helpers
   window.rs               Edge docking, geometry, pill ↔ panel transitions
@@ -143,6 +160,11 @@ docs/                     Architecture notes
   on screen (never blank). Reconnect — status returns to `live` within ~30s.
 - Change display resolution while running — geometry recalculates on next drag/toggle.
 - Leave it running for 24h — RAM stays near idle target, no leak-driven growth.
+- Wallet: import a known test phrase — the address must match what MetaMask shows for it.
+- Wallet: send a testnet transfer, then edit the amount after the quote — the confirm button
+  must go back to "Review transfer" rather than staying armed with the old fee.
+- Wallet: turn the price pill off — it disappears immediately and stays gone after a restart,
+  and the tray icon opens the wallet.
 
 ## Known MVP limitations
 
@@ -152,8 +174,12 @@ docs/                     Architecture notes
 - **Work-area detection uses the monitor's full bounds**, not the OS-reported work area minus
   the taskbar (that needs Win32 GDI FFI). In practice this only matters for bottom-edge
   docking on a machine with a bottom taskbar; right/left/top docking are unaffected.
-- No portfolio, PnL, exchange API keys, DeFi wallets, futures, or indicators — out of scope by
-  design, see the original spec's "not-goals" section.
+- **The wallet is EVM-only and deliberately small.** ETH and ERC-20 transfers on whichever chain
+  the configured RPC serves — no swaps, no NFTs, no contract interaction beyond `transfer`, no
+  hardware wallet support, and no address book.
+- **Transaction history needs a free Etherscan API key.** There is no public endpoint that
+  serves it; without a key the rest of the wallet works and the history tab says so.
+- No indicators — out of scope by design, see the original spec's "not-goals" section.
 
 ## License
 

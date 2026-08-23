@@ -1,5 +1,6 @@
 use crate::futures::FuturesSettings;
 use crate::referral::ReferralSettings;
+use crate::wallet::WalletSettings;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -7,12 +8,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
-/// Bumped to 2 when the futures and referral sections were added. There is no migration step:
-/// both sections are `#[serde(default)]`, so a version-1 file loads as-is and simply gains the
-/// defaults. That is the only safe way to extend this struct — see `load_settings_from`, which
+/// Bumped to 2 for the futures and referral sections, then to 3 for the wallet. There is no
+/// migration step: every added section is `#[serde(default)]`, so an older file loads as-is and
+/// simply gains the defaults. That is the only safe way to extend this struct — see `load_settings_from`, which
 /// answers a parse failure by backing the file up and starting from scratch. A new *required*
 /// field would therefore wipe every existing user's watchlist, alerts, and window position.
-pub const SETTINGS_VERSION: u32 = 2;
+pub const SETTINGS_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -145,6 +146,8 @@ pub struct AppSettings {
     pub futures: FuturesSettings,
     #[serde(default)]
     pub referral: ReferralSettings,
+    #[serde(default)]
+    pub wallet: WalletSettings,
 }
 
 impl Default for AppSettings {
@@ -160,6 +163,7 @@ impl Default for AppSettings {
             autostart: false,
             futures: FuturesSettings::default(),
             referral: ReferralSettings::default(),
+            wallet: WalletSettings::default(),
         }
     }
 }

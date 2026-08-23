@@ -3,6 +3,13 @@ import type { FuturesKeyStatus, FuturesState, VenueMode } from "../../types/futu
 import type { Candle, ConnectionStatus, FxRate, PairInfo, TickerSnapshot } from "../../types/market";
 import type { Partner, ReferralProfile } from "../../types/referral";
 import type { Alert, AppSettings } from "../../types/settings";
+import type {
+  AssetBalance,
+  FeeQuote,
+  NewWallet,
+  Transfer,
+  WalletState,
+} from "../../types/wallet";
 
 export const commands = {
   getSettings: () => invoke<AppSettings>("get_settings"),
@@ -52,6 +59,36 @@ export const commands = {
   refreshFutures: () => invoke<FuturesState>("refresh_futures"),
   testFuturesConnection: () => invoke<string>("test_futures_connection"),
   openFuturesWindow: () => invoke<void>("open_futures_window"),
+
+  // Wallet. The seed phrase crosses this boundary in exactly two places — out of
+  // `createWallet` and `revealSeedPhrase`, both of them an explicit user action — and never
+  // into one: nothing here takes a key, and signing happens entirely in Rust.
+  getWalletState: () => invoke<WalletState>("get_wallet_state"),
+  createWallet: () => invoke<NewWallet>("create_wallet"),
+  importWallet: (phrase: string) => invoke<WalletState>("import_wallet", { phrase }),
+  revealSeedPhrase: () => invoke<string>("reveal_seed_phrase"),
+  forgetWallet: () => invoke<WalletState>("forget_wallet"),
+  setWalletAccount: (index: number) => invoke<WalletState>("set_wallet_account", { index }),
+  setWalletNetwork: (rpcUrl: string, chainId: number) =>
+    invoke<WalletState>("set_wallet_network", { rpcUrl, chainId }),
+  setWalletWidgetEnabled: (enabled: boolean) =>
+    invoke<WalletState>("set_wallet_widget_enabled", { enabled }),
+  addWalletToken: (address: string) => invoke<WalletState>("add_wallet_token", { address }),
+  removeWalletToken: (address: string) => invoke<WalletState>("remove_wallet_token", { address }),
+  getWalletBalances: () => invoke<AssetBalance[]>("get_wallet_balances"),
+  getWalletHistory: (limit?: number) => invoke<Transfer[]>("get_wallet_history", { limit }),
+  setEtherscanKey: (apiKey: string) => invoke<WalletState>("set_etherscan_key", { apiKey }),
+  clearEtherscanKey: () => invoke<WalletState>("clear_etherscan_key"),
+  quoteWalletTransfer: (to: string, amount: string, contract: string | null) =>
+    invoke<FeeQuote>("quote_wallet_transfer", { to, amount, contract }),
+  /** `approvedMaxCostWei` is the `maxCostWei` of the quote the user approved. */
+  sendWalletTransfer: (
+    to: string,
+    amount: string,
+    contract: string | null,
+    approvedMaxCostWei: string,
+  ) => invoke<string>("send_wallet_transfer", { to, amount, contract, approvedMaxCostWei }),
+  openWalletWindow: () => invoke<void>("open_wallet_window"),
 
   startDrag: () => invoke<void>("start_drag"),
   dragEnded: () => invoke<void>("drag_ended"),
