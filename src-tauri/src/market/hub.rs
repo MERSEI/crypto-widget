@@ -47,20 +47,29 @@ impl MarketHub {
             .map(|until| Instant::now() < until)
             .unwrap_or(false);
 
-        // A halted pair keeps returning the price of its last trade over REST forever. It is
-        // still worth storing — the row shows it greyed out rather than as `···` — but it must
-        // not reach the spike buffer or the alert engine, or a weeks-old number would keep
-        // arming and firing rules as if the market had just printed it.
-        let stale = update.is_stale(super::now_ms());
-
-        // Two venues never agree to the last cent, so a source switch would otherwise land in
-        // the buffer as an instant jump and read as a spike.
-        let source_changed = self
+        let now = super::now_ms();
+        let prev = self
             .tickers
             .read()
             .unwrap()
             .get(&update.symbol)
-            .map(|prev| prev.source != update.source)
+            .map(|prev| (prev.source.clone(), prev.is_stale(now)));
+
+        if !accepts_update(prev.as_ref().map(|(source, stale)| (source.as_str(), *stale)), &update.source) {
+            return;
+        }
+
+        // A halted pair keeps returning the price of its last trade over REST forever. It is
+        // still worth storing — the row shows it greyed out rather than as `···` — but it must
+        // not reach the spike buffer or the alert engine, or a weeks-old number would keep
+        // arming and firing rules as if the market had just printed it.
+        let stale = update.is_stale(now);
+
+        // Two venues never agree to the last cent, so a source switch would otherwise land in
+        // the buffer as an instant jump and read as a spike.
+        let source_changed = prev
+            .as_ref()
+            .map(|(source, _)| *source != update.source)
             .unwrap_or(false);
         if source_changed {
             self.buffers.write().unwrap().clear_symbol(&update.symbol);
@@ -154,5 +163,47 @@ impl MarketHub {
                 }
             }
         });
+    }
+}
+
+/// Whether an incoming ticker update should be allowed to replace what is currently stored for
+/// its symbol. Binance is the priority source: a backup-venue answer that was already in flight
+/// when Binance recovered must not override the fresher primary price it raced against. `prev`
+/// is `None` when nothing is stored yet for the symbol.
+fn accepts_update(prev: Option<(&str, bool)>, update_source: &str) -> bool {
+    if update_source == "binance" {
+        return true;
+    }
+    match prev {
+        Some((source, prev_stale)) => source != "binance" || prev_stale,
+        None => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn binance_updates_always_win() {
+        assert!(accepts_update(None, "binance"));
+        assert!(accepts_update(Some(("okx", false)), "binance"));
+        assert!(accepts_update(Some(("binance", false)), "binance"));
+    }
+
+    #[test]
+    fn a_backup_answer_is_dropped_if_binance_is_already_fresh() {
+        assert!(!accepts_update(Some(("binance", false)), "okx"));
+    }
+
+    #[test]
+    fn a_backup_answer_is_accepted_once_binance_has_actually_gone_stale() {
+        assert!(accepts_update(Some(("binance", true)), "okx"));
+    }
+
+    #[test]
+    fn a_backup_answer_is_accepted_when_nothing_is_stored_yet_or_another_backup_had_it() {
+        assert!(accepts_update(None, "okx"));
+        assert!(accepts_update(Some(("bybit", false)), "okx"));
     }
 }

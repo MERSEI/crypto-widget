@@ -109,7 +109,17 @@ stale — it is still shown, marked, but it never reaches the spike buffer or th
 order, for any symbol the primary feed has gone quiet on; the venue that answered is remembered
 per symbol and tried first next time. A newly added pair takes the same route immediately instead
 of waiting for the sweep. The venue that supplied a price rides along in `TickerSnapshot.source`
-and is shown in the row.
+and is shown in the row. Requests to the four venues share a `WeightLimiter` (`market/ratelimit.rs`)
+so a watchlist full of stale symbols can't turn into an unthrottled burst, and every failed request
+is logged with the venue's name instead of being swallowed silently.
+
+Binance is always the priority source, enforced in `MarketHub::apply_ticker`: a backup sweep can
+take up to ~30s to walk its venue list end to end, so Binance may have already recovered for a
+symbol by the time a backup answer comes back. A backup update is only applied if the currently
+stored price for that symbol is missing, from another backup venue, or itself stale — a fresh
+Binance price is never overwritten by a backup answer that raced against it. This is per-symbol,
+not global: the chain above never falls back for the whole watchlist, only for the one pair
+Binance has nothing live for.
 
 No price aggregator sits in that chain on purpose: aggregators are keyed by ticker symbol, and
 symbols get recycled — after Toncoin's rebrand to GRAM, CoinGecko's `TON` is Tokamak Network, so

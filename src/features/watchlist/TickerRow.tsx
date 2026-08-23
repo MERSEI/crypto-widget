@@ -63,7 +63,7 @@ export function TickerRow({ symbol, onToggle, onRemove, onEditAlert }: Props) {
           </span>
         )}
         {!isStale && backupSource && (
-          <span className="ticker-row__badge" title={`Price from ${backupSource} — Binance has no live quote`}>
+          <span className="ticker-row__badge" title={`Price from ${backupSource} — Binance has no live quote for this pair (other watchlist pairs are unaffected)`}>
             {backupSource.toUpperCase()}
           </span>
         )}

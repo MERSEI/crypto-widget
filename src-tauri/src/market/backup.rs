@@ -12,6 +12,7 @@
 //! Network these days, so a symbol lookup would have answered "TONUSDT = 0.27" with total
 //! confidence.
 
+use super::ratelimit::WeightLimiter;
 use super::{now_ms, split_pair, TickerSnapshot};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -77,6 +78,10 @@ pub struct BackupProvider {
     /// Which venue last answered for a symbol, so the next refresh starts there instead of
     /// walking the whole list again. Purely an optimisation — a miss just falls through.
     preferred: Mutex<HashMap<String, Venue>>,
+    /// None of these venues publish a documented public-tier limit as low as Binance's, but
+    /// none are asked to prove it either — a shared, conservative budget across all four keeps
+    /// a watchlist full of stale symbols from turning into a burst that gets this IP throttled.
+    limiter: WeightLimiter,
 }
 
 impl BackupProvider {
@@ -87,6 +92,7 @@ impl BackupProvider {
                 .build()
                 .expect("reqwest client"),
             preferred: Mutex::new(HashMap::new()),
+            limiter: WeightLimiter::new("backup", 10.0, 5.0),
         }
     }
 
@@ -122,19 +128,35 @@ impl BackupProvider {
     }
 
     async fn fetch_one(&self, venue: Venue, base: &str, quote: &str) -> Option<Quote> {
-        let body = self
-            .client
-            .get(venue.url(base, quote))
-            .send()
-            .await
-            .ok()?
-            .error_for_status()
-            .ok()?
-            .text()
-            .await
-            .ok()?;
+        if let Err(e) = self.limiter.take(1.0) {
+            eprintln!("backup {}: {e}", venue.name());
+            return None;
+        }
+
+        let response = match self.client.get(venue.url(base, quote)).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("backup {} request failed: {e}", venue.name());
+                return None;
+            }
+        };
+        let response = match response.error_for_status() {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("backup {} returned an error status: {e}", venue.name());
+                return None;
+            }
+        };
+        let body = match response.text().await {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("backup {} body read failed: {e}", venue.name());
+                return None;
+            }
+        };
         // A pair the venue doesn't list comes back as a well-formed error body, not an HTTP
-        // error, on most of these APIs — so parsing failure is the "not here" signal.
+        // error, on most of these APIs — so parsing failure is the "not here" signal, not
+        // logged as one.
         venue.parse(&body).filter(|q| q.price > 0.0)
     }
 }
