@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { commands } from "../../core/ipc/commands";
 import { useWalletStore, walletErrorMessage } from "../../core/store/wallet";
+import { CUSTOM_NETWORK_ID, NETWORK_PRESETS, presetFor } from "./networks";
 import { SeedPhrase } from "./SeedPhrase";
 
 /**
@@ -18,6 +19,12 @@ export function WalletSettingsForm() {
 
   const [rpcUrl, setRpcUrl] = useState(state?.settings.rpcUrl ?? "");
   const [chainId, setChainId] = useState(String(state?.settings.chainId ?? 1));
+  const [nativeSymbol, setNativeSymbol] = useState(state?.settings.nativeSymbol ?? "ETH");
+  const [networkId, setNetworkId] = useState(
+    () =>
+      presetFor(state?.settings.rpcUrl ?? "", state?.settings.chainId ?? 1)?.id ??
+      CUSTOM_NETWORK_ID,
+  );
   const [accountIndex, setAccountIndex] = useState(String(state?.settings.accountIndex ?? 0));
   const [apiKey, setApiKey] = useState("");
   const [phrase, setPhrase] = useState<string | null>(null);
@@ -26,6 +33,16 @@ export function WalletSettingsForm() {
   const [busy, setBusy] = useState(false);
 
   if (!state) return null;
+
+  function selectNetwork(id: string) {
+    setNetworkId(id);
+    if (id === CUSTOM_NETWORK_ID) return;
+    const preset = NETWORK_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setRpcUrl(preset.rpcUrl);
+    setChainId(String(preset.chainId));
+    setNativeSymbol(preset.nativeSymbol);
+  }
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -50,34 +67,74 @@ export function WalletSettingsForm() {
       <div className="wallet-settings__group">
         <h3 className="wallet-settings__group-title">Network</h3>
         <label className="wallet-field">
-          <span className="wallet-field__label">RPC URL</span>
-          <input
+          <span className="wallet-field__label">Chain</span>
+          <select
             className="wallet__input"
-            spellCheck={false}
-            autoComplete="off"
-            value={rpcUrl}
-            onChange={(e) => setRpcUrl(e.target.value)}
-          />
-        </label>
-        <label className="wallet-field">
-          <span className="wallet-field__label">Chain ID</span>
-          <input
-            className="wallet__input mono-nums"
-            inputMode="numeric"
-            value={chainId}
-            onChange={(e) => setChainId(e.target.value)}
-          />
+            value={networkId}
+            onChange={(e) => selectNetwork(e.target.value)}
+          >
+            {NETWORK_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+              </option>
+            ))}
+            <option value={CUSTOM_NETWORK_ID}>Custom</option>
+          </select>
           <span className="wallet-field__hint">
-            The chain the RPC serves, and the one the history is read for — a mismatch shows an
-            empty wallet, not an error.
+            The wallet works on any EVM chain — this list is a shortcut for the common ones. Pick
+            Custom to point at a different RPC by hand.
           </span>
         </label>
+
+        {networkId === CUSTOM_NETWORK_ID && (
+          <>
+            <label className="wallet-field">
+              <span className="wallet-field__label">RPC URL</span>
+              <input
+                className="wallet__input"
+                spellCheck={false}
+                autoComplete="off"
+                value={rpcUrl}
+                onChange={(e) => setRpcUrl(e.target.value)}
+              />
+            </label>
+            <label className="wallet-field">
+              <span className="wallet-field__label">Chain ID</span>
+              <input
+                className="wallet__input mono-nums"
+                inputMode="numeric"
+                value={chainId}
+                onChange={(e) => setChainId(e.target.value)}
+              />
+              <span className="wallet-field__hint">
+                The chain the RPC serves, and the one the history is read for — a mismatch shows
+                an empty wallet, not an error.
+              </span>
+            </label>
+            <label className="wallet-field">
+              <span className="wallet-field__label">Currency symbol</span>
+              <input
+                className="wallet__input"
+                spellCheck={false}
+                autoComplete="off"
+                placeholder="ETH"
+                value={nativeSymbol}
+                onChange={(e) => setNativeSymbol(e.target.value)}
+              />
+              <span className="wallet-field__hint">
+                Only cosmetic — how the native balance and fees are labelled. This chain must
+                still support EIP-1559 fees, or every quote will fail.
+              </span>
+            </label>
+          </>
+        )}
+
         <button
           className="btn"
           disabled={busy}
           onClick={() =>
             void run(async () => {
-              apply(await commands.setWalletNetwork(rpcUrl, Number(chainId)));
+              apply(await commands.setWalletNetwork(rpcUrl, Number(chainId), nativeSymbol));
               await refreshBalances();
             })
           }

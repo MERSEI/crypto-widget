@@ -82,6 +82,94 @@ impl Position {
     }
 }
 
+/// `BUY` opens/adds to a long (or closes a short); `SELL` is the reverse. Binance's own vocabulary,
+/// kept rather than translated to long/short so a signed request and the UI that built it always
+/// agree on the word.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum OrderSide {
+    Buy,
+    Sell,
+}
+
+impl OrderSide {
+    pub fn as_binance_str(self) -> &'static str {
+        match self {
+            OrderSide::Buy => "BUY",
+            OrderSide::Sell => "SELL",
+        }
+    }
+
+    pub fn opposite(self) -> Self {
+        match self {
+            OrderSide::Buy => OrderSide::Sell,
+            OrderSide::Sell => OrderSide::Buy,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum OrderType {
+    Market,
+    Limit,
+}
+
+impl OrderType {
+    pub fn as_binance_str(self) -> &'static str {
+        match self {
+            OrderType::Market => "MARKET",
+            OrderType::Limit => "LIMIT",
+        }
+    }
+}
+
+/// A new order as the trader built it. Validated in `commands.rs` before this is ever
+/// constructed — this struct assumes a positive quantity, a price present iff the type needs one.
+#[derive(Debug, Clone)]
+pub struct NewOrder {
+    pub symbol: String,
+    pub side: OrderSide,
+    pub order_type: OrderType,
+    pub quantity: f64,
+    /// Required for `Limit`, ignored for `Market`.
+    pub price: Option<f64>,
+    /// Refuses to open or add to a position — only ever shrinks one. Set by the "reduce" path so
+    /// a fat-fingered quantity cannot flip a reduce into an accidental reversal.
+    pub reduce_only: bool,
+}
+
+/// What Binance hands back once an order is accepted. Not necessarily filled yet — a `LIMIT`
+/// order can sit on the book — so the caller re-reads positions from the next poll rather than
+/// trusting this row's quantity as the new position size.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderReceipt {
+    pub order_id: i64,
+    pub symbol: String,
+    pub status: String,
+    pub avg_price: f64,
+    pub executed_qty: f64,
+}
+
+/// One row of order history — filled, cancelled, or still open.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderRecord {
+    pub order_id: i64,
+    pub symbol: String,
+    pub side: String,
+    pub order_type: String,
+    pub status: String,
+    pub price: f64,
+    pub avg_price: f64,
+    pub orig_qty: f64,
+    pub executed_qty: f64,
+    pub reduce_only: bool,
+    /// Unix ms.
+    pub time: i64,
+}
+
 /// Account-level totals, in the account's quote asset (USDT for USDⓈ-M).
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +199,40 @@ pub trait FuturesVenue: Send + Sync {
     /// Cheap authenticated call used to check that a key works and has the right permissions.
     /// Returns a human-readable summary for the "Test connection" button.
     async fn check_credentials(&self) -> Result<String, String>;
+
+    // Everything below spends money. `FuturesHub` refuses to call any of it unless
+    // `VenueMode::allows_trading()` — the implementation must not re-derive that rule, only
+    // execute what it is asked.
+
+    /// Places a market or limit order.
+    async fn place_order(&self, order: NewOrder) -> Result<OrderReceipt, String>;
+
+    /// Cancels a resting order.
+    async fn cancel_order(&self, symbol: &str, order_id: i64) -> Result<(), String>;
+
+    /// Shrinks or fully closes a position with a reduce-only market order. `quantity` of `None`
+    /// closes the whole position (Binance's `closePosition` flag) — the size that could drift
+    /// between "the trader looked at the position" and "the order was built" is exactly what
+    /// makes a typed partial quantity the riskier default, not the safer one.
+    async fn close_position(
+        &self,
+        symbol: &str,
+        side: OrderSide,
+        quantity: Option<f64>,
+    ) -> Result<OrderReceipt, String>;
+
+    /// Changes leverage for a symbol. Binance applies this account-wide for the symbol, not per
+    /// order — takes effect on the next order placed.
+    async fn set_leverage(&self, symbol: &str, leverage: u32) -> Result<(), String>;
+
+    /// Switches a symbol between isolated and cross margin. Refused by Binance while a position
+    /// or an open order exists on that symbol — the caller sees that refusal as the returned
+    /// error, not a silent no-op.
+    async fn set_margin_type(&self, symbol: &str, isolated: bool) -> Result<(), String>;
+
+    /// Order history for one symbol — Binance's futures API has no "every symbol" history
+    /// endpoint, so the caller always names one.
+    async fn order_history(&self, symbol: &str, limit: u32) -> Result<Vec<OrderRecord>, String>;
 }
 
 #[cfg(test)]

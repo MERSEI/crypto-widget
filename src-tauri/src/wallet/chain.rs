@@ -106,8 +106,14 @@ fn http_provider(rpc_url: &str) -> Result<impl Provider, String> {
     Ok(ProviderBuilder::new().connect_http(url))
 }
 
-/// Reads the native balance of an address.
-pub async fn native_balance(rpc_url: &str, address: Address) -> Result<AssetBalance, String> {
+/// Reads the native balance of an address. `symbol` is the chain's native currency ticker
+/// ("ETH", "POL", "BNB", …) as configured in `WalletSettings::native_symbol` — there is no RPC
+/// call that reports it.
+pub async fn native_balance(
+    rpc_url: &str,
+    address: Address,
+    symbol: &str,
+) -> Result<AssetBalance, String> {
     let provider = http_provider(rpc_url)?;
     let raw = provider
         .get_balance(address)
@@ -115,7 +121,7 @@ pub async fn native_balance(rpc_url: &str, address: Address) -> Result<AssetBala
         .map_err(|e| format!("could not read the balance: {e}"))?;
     Ok(AssetBalance {
         contract: None,
-        symbol: "ETH".into(),
+        symbol: symbol.to_string(),
         decimals: 18,
         raw: raw.to_string(),
         amount: format_units(raw, 18).map_err(|e| e.to_string())?,
@@ -256,13 +262,15 @@ async fn build_request(
     }
 }
 
-/// Estimates gas and fees for a transfer and checks the account can cover it.
+/// Estimates gas and fees for a transfer and checks the account can cover it. `native_symbol` is
+/// used only for the shortfall message — the quote itself is chain-agnostic.
 pub async fn quote(
     rpc_url: &str,
     from: Address,
     to: Address,
     amount: &str,
     token: Option<Address>,
+    native_symbol: &str,
 ) -> Result<FeeQuote, String> {
     let provider = http_provider(rpc_url)?;
     let (request, value) = build_request(rpc_url, from, to, amount, token).await?;
@@ -297,7 +305,7 @@ pub async fn quote(
             None
         } else {
             Some(format!(
-                "{} ETH short of the amount plus the maximum fee",
+                "{} {native_symbol} short of the amount plus the maximum fee",
                 format_amount(required - native, 18)
             ))
         },

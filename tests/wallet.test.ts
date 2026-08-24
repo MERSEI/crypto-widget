@@ -28,6 +28,7 @@ function walletState(initialized = true): WalletState {
       accountIndex: 0,
       tokens: [],
       widgetEnabled: true,
+      nativeSymbol: "ETH",
     },
     etherscan: { present: false, maskedKey: null },
   };

@@ -33,6 +33,8 @@ export interface WalletSettings {
   accountIndex: number;
   tokens: TokenEntry[];
   widgetEnabled: boolean;
+  /** Ticker of the chain's native currency — "ETH", "POL", "BNB", … */
+  nativeSymbol: string;
 }
 
 export interface WalletState {

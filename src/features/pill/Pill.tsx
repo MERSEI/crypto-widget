@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { formatPercent } from "../../core/format/percent";
+import { formatPrice } from "../../core/format/price";
 import { useWatchlistStore } from "../../core/store/watchlist";
 import { useSettingsStore } from "../../core/store/settings";
 import { useTickersStore } from "../../core/store/tickers";
@@ -39,6 +40,7 @@ export function Pill() {
     <div className="pill" onPointerDown={onPointerDown} title="Click to open · drag to move">
       <span className={`pill__connection pill__connection--${connectionState}`} />
       <span className="pill__ticker mono-nums">{label}</span>
+      {topTicker && <span className="pill__price mono-nums">{formatPrice(topTicker.price)}</span>}
       {topTicker && <span className="pill__delta mono-nums">{formatPercent(delta)}</span>}
       <span className={`pill__dot ${delta > 0 ? "pill__dot--up" : delta < 0 ? "pill__dot--down" : ""}`} />
     </div>

@@ -301,6 +301,7 @@ pub async fn fetch_history(
     address: &str,
     token_contracts: &[String],
     limit: u32,
+    native_symbol: &str,
 ) -> Result<Vec<Transfer>, EtherscanError> {
     let common = |action: &str| {
         vec![
@@ -321,7 +322,7 @@ pub async fn fetch_history(
     transfers.extend(
         native
             .iter()
-            .filter_map(|raw| normalize(raw, address, AssetKind::Native, "ETH")),
+            .filter_map(|raw| normalize(raw, address, AssetKind::Native, native_symbol)),
     );
 
     // One `tokentx` call without a contract filter returns transfers of *every* token the

@@ -195,12 +195,15 @@ pub async fn set_wallet_account(
     })
 }
 
-/// Points the wallet at a different node or chain.
+/// Points the wallet at a different node or chain. `native_symbol` names the chain's gas token
+/// ("ETH", "POL", "BNB", …) — there is no RPC call that answers this, so the caller (a network
+/// preset, or a manual entry defaulting to "ETH") must supply it.
 #[tauri::command]
 pub async fn set_wallet_network(
     state: State<'_, AppState>,
     rpc_url: String,
     chain_id: u64,
+    native_symbol: String,
 ) -> Result<WalletState, String> {
     let url = rpc_url.trim().to_string();
     // Plain http is refused rather than merely discouraged: an RPC carries the addresses being
@@ -211,9 +214,14 @@ pub async fn set_wallet_network(
     if chain_id == 0 {
         return Err("chain id must be greater than zero".into());
     }
+    let symbol = native_symbol.trim().to_string();
+    if symbol.is_empty() {
+        return Err("the native currency symbol cannot be empty".into());
+    }
     update(&state, |wallet| {
         wallet.rpc_url = url;
         wallet.chain_id = chain_id;
+        wallet.native_symbol = symbol;
         Ok(())
     })
 }
@@ -301,7 +309,8 @@ pub async fn get_wallet_balances(
     let settings = wallet_settings(&state);
     let owner = chain::parse_address(&keystore::address_for(settings.account_index)?)?;
 
-    let mut balances = vec![chain::native_balance(&settings.rpc_url, owner).await?];
+    let mut balances =
+        vec![chain::native_balance(&settings.rpc_url, owner, &settings.native_symbol).await?];
 
     for token in &settings.tokens {
         let row = match chain::parse_address(&token.address) {
@@ -345,6 +354,7 @@ pub async fn get_wallet_history(
         &address,
         &contracts,
         limit,
+        &settings.native_symbol,
     )
     .await
     // The kind is what tells the user which of these is their problem to fix: a rejected key is
@@ -390,7 +400,15 @@ pub async fn quote_wallet_transfer(
     let destination = parse_destination(&to, token)?;
     let from = chain::parse_address(&keystore::address_for(settings.account_index)?)?;
 
-    chain::quote(&settings.rpc_url, from, destination, &amount, token).await
+    chain::quote(
+        &settings.rpc_url,
+        from,
+        destination,
+        &amount,
+        token,
+        &settings.native_symbol,
+    )
+    .await
 }
 
 /// Signs and broadcasts a transfer the user approved.
@@ -416,7 +434,15 @@ pub async fn send_wallet_transfer(
     let approved = U256::from_str_radix(approved_max_cost_wei.trim(), 10)
         .map_err(|_| "the approved fee is unreadable — review the transfer again".to_string())?;
 
-    let quote = chain::quote(&settings.rpc_url, from, destination, &amount, token).await?;
+    let quote = chain::quote(
+        &settings.rpc_url,
+        from,
+        destination,
+        &amount,
+        token,
+        &settings.native_symbol,
+    )
+    .await?;
     if !quote.affordable {
         return Err(quote
             .shortfall
@@ -427,8 +453,8 @@ pub async fn send_wallet_transfer(
         .map_err(|_| "could not read the current fee estimate".to_string())?;
     if current > fee_ceiling(approved) {
         return Err(format!(
-            "the fee rose to {} ETH since you approved it — review the transfer again",
-            quote.max_cost_eth
+            "the fee rose to {} {} since you approved it — review the transfer again",
+            quote.max_cost_eth, settings.native_symbol
         ));
     }
 

@@ -3,7 +3,11 @@ use tauri::{LogicalPosition, LogicalSize, WebviewWindow};
 
 /// A horizontal bar rather than a vertical strip: rotated text in a 28px-wide sliver was
 /// unreadable at a glance, which is the one thing this widget exists to do.
-pub const PILL_WIDTH: f64 = 140.0;
+///
+/// Widened from 140 to fit the price next to the symbol and the percent change — three columns
+/// of `mono-nums` text plus the connection dot and the up/down dot no longer fit in 140 without
+/// truncating the price to illegibility.
+pub const PILL_WIDTH: f64 = 190.0;
 pub const PILL_HEIGHT: f64 = 30.0;
 
 pub struct Rect {

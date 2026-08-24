@@ -1,6 +1,8 @@
 import { useFuturesStore } from "../../core/store/futures";
 import type { VenueMode } from "../../types/futures";
 import { ApiKeysForm } from "./ApiKeysForm";
+import { OrderForm } from "./OrderForm";
+import { OrderHistory } from "./OrderHistory";
 import { PositionTable } from "./PositionTable";
 import { useFutures } from "./hooks/useFutures";
 
@@ -96,8 +98,24 @@ export function FuturesWindow() {
 
       <section className="futures-window__positions">
         <h2 className="futures-window__section-title">Open positions</h2>
-        <PositionTable positions={positions} variant="full" />
+        <PositionTable positions={positions} variant="full" tradingAllowed={state.tradingAllowed} />
       </section>
+
+      {state.tradingAllowed ? (
+        <OrderForm />
+      ) : (
+        state.status !== "off" &&
+        state.status !== "nokey" && (
+          <div className="wallet-settings__group">
+            <h3 className="wallet-settings__group-title">Order</h3>
+            <p className="wallet-field__hint" title="Orders are only ever sent to the testnet">
+              Switch to Testnet above to place orders — mainnet stays read-only by design.
+            </p>
+          </div>
+        )
+      )}
+
+      <OrderHistory />
     </div>
   );
 }

@@ -57,3 +57,29 @@ export interface FuturesKeyStatus {
   mainnet: CredentialStatus;
   testnet: CredentialStatus;
 }
+
+export type OrderSide = "buy" | "sell";
+export type OrderKind = "market" | "limit";
+
+export interface OrderReceipt {
+  orderId: number;
+  symbol: string;
+  status: string;
+  avgPrice: number;
+  executedQty: number;
+}
+
+export interface OrderRecord {
+  orderId: number;
+  symbol: string;
+  side: string;
+  orderType: string;
+  status: string;
+  price: number;
+  avgPrice: number;
+  origQty: number;
+  executedQty: number;
+  reduceOnly: boolean;
+  /** Unix ms. */
+  time: number;
+}

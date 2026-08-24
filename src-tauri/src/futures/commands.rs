@@ -1,4 +1,5 @@
 use super::hub::FuturesState;
+use super::venue::{NewOrder, OrderRecord, OrderReceipt, OrderSide, OrderType};
 use super::VenueMode;
 use crate::secrets::{self, Credential, CredentialStatus};
 use crate::AppState;
@@ -25,6 +26,33 @@ fn mode_from(name: &str) -> Result<VenueMode, String> {
         "testnet" => Ok(VenueMode::Testnet),
         other => Err(format!("unknown venue: {other}")),
     }
+}
+
+fn side_from(value: &str) -> Result<OrderSide, String> {
+    match value {
+        "buy" => Ok(OrderSide::Buy),
+        "sell" => Ok(OrderSide::Sell),
+        other => Err(format!("unknown order side: {other}")),
+    }
+}
+
+fn order_type_from(value: &str) -> Result<OrderType, String> {
+    match value {
+        "market" => Ok(OrderType::Market),
+        "limit" => Ok(OrderType::Limit),
+        other => Err(format!("unknown order type: {other}")),
+    }
+}
+
+/// Upper-cases and validates a symbol before it reaches a signed request. Binance rejects a bad
+/// symbol anyway, but doing it here turns "BTC/USDT" or an empty field into a message about the
+/// symbol instead of an opaque exchange error.
+fn normalize_symbol(symbol: &str) -> Result<String, String> {
+    let trimmed = symbol.trim().to_uppercase();
+    if trimmed.is_empty() || !trimmed.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err("symbol must be letters and digits only, e.g. BTCUSDT".into());
+    }
+    Ok(trimmed)
 }
 
 #[tauri::command]
@@ -130,6 +158,118 @@ pub async fn test_futures_connection(state: State<'_, AppState>) -> Result<Strin
     state.futures.check_credentials().await
 }
 
+/// Places a market or limit order. `FuturesHub::place_order` refuses this outright unless the
+/// active venue is the testnet — validation here is about the shape of the request, not the
+/// permission to send it.
+#[tauri::command]
+pub async fn place_futures_order(
+    state: State<'_, AppState>,
+    symbol: String,
+    side: String,
+    order_type: String,
+    quantity: f64,
+    price: Option<f64>,
+    reduce_only: bool,
+) -> Result<OrderReceipt, String> {
+    let symbol = normalize_symbol(&symbol)?;
+    let side = side_from(&side)?;
+    let order_type = order_type_from(&order_type)?;
+    if !(quantity.is_finite() && quantity > 0.0) {
+        return Err("quantity must be a positive number".into());
+    }
+    let price = match order_type {
+        OrderType::Limit => {
+            let p = price.ok_or("a limit order needs a price")?;
+            if !(p.is_finite() && p > 0.0) {
+                return Err("price must be a positive number".into());
+            }
+            Some(p)
+        }
+        OrderType::Market => None,
+    };
+
+    state
+        .futures
+        .place_order(NewOrder {
+            symbol,
+            side,
+            order_type,
+            quantity,
+            price,
+            reduce_only,
+        })
+        .await
+}
+
+/// Closes (`quantity: null`) or partially reduces (`quantity` given) an open position with a
+/// reduce-only market order. `side` is the *closing* order's side — `sell` to close a long,
+/// `buy` to close a short — named by the caller, which already knows the position's direction
+/// from the snapshot it is looking at.
+#[tauri::command]
+pub async fn close_futures_position(
+    state: State<'_, AppState>,
+    symbol: String,
+    side: String,
+    quantity: Option<f64>,
+) -> Result<OrderReceipt, String> {
+    let symbol = normalize_symbol(&symbol)?;
+    let side = side_from(&side)?;
+    if let Some(q) = quantity {
+        if !(q.is_finite() && q > 0.0) {
+            return Err("quantity must be a positive number".into());
+        }
+    }
+    state.futures.close_position(symbol, side, quantity).await
+}
+
+/// Cancels a resting (unfilled) order.
+#[tauri::command]
+pub async fn cancel_futures_order(
+    state: State<'_, AppState>,
+    symbol: String,
+    order_id: i64,
+) -> Result<(), String> {
+    let symbol = normalize_symbol(&symbol)?;
+    state.futures.cancel_order(symbol, order_id).await
+}
+
+#[tauri::command]
+pub async fn set_futures_leverage(
+    state: State<'_, AppState>,
+    symbol: String,
+    leverage: u32,
+) -> Result<(), String> {
+    let symbol = normalize_symbol(&symbol)?;
+    if !(1..=125).contains(&leverage) {
+        return Err("leverage must be between 1 and 125".into());
+    }
+    state.futures.set_leverage(symbol, leverage).await
+}
+
+/// Switches a symbol between isolated and cross margin. Binance refuses this while a position or
+/// an open order exists on the symbol — that refusal reaches the caller as this command's error.
+#[tauri::command]
+pub async fn set_futures_margin_type(
+    state: State<'_, AppState>,
+    symbol: String,
+    isolated: bool,
+) -> Result<(), String> {
+    let symbol = normalize_symbol(&symbol)?;
+    state.futures.set_margin_type(symbol, isolated).await
+}
+
+/// Order history for one symbol. Read-only, so it works on mainnet too.
+#[tauri::command]
+pub async fn get_futures_order_history(
+    state: State<'_, AppState>,
+    symbol: String,
+    limit: Option<u32>,
+) -> Result<Vec<OrderRecord>, String> {
+    let symbol = normalize_symbol(&symbol)?;
+    let limit = limit.unwrap_or(50).clamp(1, 200);
+    state.futures.order_history(symbol, limit).await
+}
+
 /// Opens (or focuses) the standalone futures terminal.
 ///
 /// A 380px-wide docked pill cannot hold an order form and a position table at once, so the
@@ -172,5 +312,23 @@ mod tests {
         assert!(mode_from("TESTNET").is_err(), "the wire format is lowercase");
         assert!(mode_from("").is_err());
         assert!(mode_from("mainnet ").is_err());
+    }
+
+    #[test]
+    fn order_side_and_type_are_lowercase_on_the_wire() {
+        assert_eq!(side_from("buy").unwrap(), OrderSide::Buy);
+        assert_eq!(side_from("sell").unwrap(), OrderSide::Sell);
+        assert!(side_from("BUY").is_err());
+        assert_eq!(order_type_from("market").unwrap(), OrderType::Market);
+        assert_eq!(order_type_from("limit").unwrap(), OrderType::Limit);
+        assert!(order_type_from("stop").is_err());
+    }
+
+    #[test]
+    fn a_symbol_is_upper_cased_and_checked_for_junk() {
+        assert_eq!(normalize_symbol(" btcusdt ").unwrap(), "BTCUSDT");
+        assert!(normalize_symbol("BTC/USDT").is_err(), "a slash is not a symbol character");
+        assert!(normalize_symbol("").is_err());
+        assert!(normalize_symbol("   ").is_err());
     }
 }

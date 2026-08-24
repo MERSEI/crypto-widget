@@ -87,8 +87,16 @@ body {
   white-space: nowrap;
 }
 
-.pill__delta {
+.pill__price {
   margin-left: auto;
+  font-size: 11px;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill__delta {
   font-size: 11px;
   color: var(--text-1);
   white-space: nowrap;

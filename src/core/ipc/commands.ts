@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { FuturesKeyStatus, FuturesState, VenueMode } from "../../types/futures";
+import type {
+  FuturesKeyStatus,
+  FuturesState,
+  OrderKind,
+  OrderRecord,
+  OrderReceipt,
+  OrderSide,
+  VenueMode,
+} from "../../types/futures";
 import type { Candle, ConnectionStatus, FxRate, PairInfo, TickerSnapshot } from "../../types/market";
 import type { Partner, ReferralProfile } from "../../types/referral";
 import type { Alert, AppSettings } from "../../types/settings";
@@ -59,6 +67,34 @@ export const commands = {
     invoke<FuturesState>("set_futures_preferences", { defaultLeverage, confirmOrders }),
   refreshFutures: () => invoke<FuturesState>("refresh_futures"),
   testFuturesConnection: () => invoke<string>("test_futures_connection"),
+  // Trading. `place_futures_order`/`close_futures_position`/etc. are refused in Rust unless the
+  // active venue is the testnet — see `FuturesHub::ensure_trading_allowed`.
+  placeFuturesOrder: (
+    symbol: string,
+    side: OrderSide,
+    orderType: OrderKind,
+    quantity: number,
+    price: number | null,
+    reduceOnly: boolean,
+  ) =>
+    invoke<OrderReceipt>("place_futures_order", {
+      symbol,
+      side,
+      orderType,
+      quantity,
+      price,
+      reduceOnly,
+    }),
+  closeFuturesPosition: (symbol: string, side: OrderSide, quantity: number | null) =>
+    invoke<OrderReceipt>("close_futures_position", { symbol, side, quantity }),
+  cancelFuturesOrder: (symbol: string, orderId: number) =>
+    invoke<void>("cancel_futures_order", { symbol, orderId }),
+  setFuturesLeverage: (symbol: string, leverage: number) =>
+    invoke<void>("set_futures_leverage", { symbol, leverage }),
+  setFuturesMarginType: (symbol: string, isolated: boolean) =>
+    invoke<void>("set_futures_margin_type", { symbol, isolated }),
+  getFuturesOrderHistory: (symbol: string, limit?: number) =>
+    invoke<OrderRecord[]>("get_futures_order_history", { symbol, limit }),
   openFuturesWindow: () => invoke<void>("open_futures_window"),
 
   // Wallet. The seed phrase crosses this boundary in exactly two places — out of
@@ -70,8 +106,8 @@ export const commands = {
   revealSeedPhrase: () => invoke<string>("reveal_seed_phrase"),
   forgetWallet: () => invoke<WalletState>("forget_wallet"),
   setWalletAccount: (index: number) => invoke<WalletState>("set_wallet_account", { index }),
-  setWalletNetwork: (rpcUrl: string, chainId: number) =>
-    invoke<WalletState>("set_wallet_network", { rpcUrl, chainId }),
+  setWalletNetwork: (rpcUrl: string, chainId: number, nativeSymbol: string) =>
+    invoke<WalletState>("set_wallet_network", { rpcUrl, chainId, nativeSymbol }),
   setWalletWidgetEnabled: (enabled: boolean) =>
     invoke<WalletState>("set_wallet_widget_enabled", { enabled }),
   addWalletToken: (address: string) => invoke<WalletState>("add_wallet_token", { address }),

@@ -16,6 +16,7 @@ import type { FeeQuote } from "../../types/wallet";
  */
 export function SendForm() {
   const balances = useWalletStore((s) => s.balances);
+  const nativeSymbol = useWalletStore((s) => s.state?.settings.nativeSymbol ?? "ETH");
   const refreshBalances = useWalletStore((s) => s.refreshBalances);
   const refreshHistory = useWalletStore((s) => s.refreshHistory);
 
@@ -86,7 +87,7 @@ export function SendForm() {
       <label className="wallet-field">
         <span className="wallet-field__label">Asset</span>
         <select value={contract} onChange={(e) => edit(setContract)(e.target.value)}>
-          <option value="">ETH</option>
+          <option value="">{nativeSymbol}</option>
           {balances
             .filter((b) => b.contract)
             .map((b) => (
@@ -137,7 +138,9 @@ export function SendForm() {
           </div>
           <div className="wallet-quote__row">
             <span>Maximum fee</span>
-            <span className="mono-nums">{quote.maxCostEth} ETH</span>
+            <span className="mono-nums">
+              {quote.maxCostEth} {nativeSymbol}
+            </span>
           </div>
           {!quote.affordable && quote.shortfall && (
             <div className="wallet-quote__row wallet-quote__shortfall">

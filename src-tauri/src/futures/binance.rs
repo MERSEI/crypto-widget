@@ -12,7 +12,10 @@
 //! treats a non-finite result as absent.
 
 use super::signer::{Query, TimeSync};
-use super::venue::{AccountSummary, FuturesSnapshot, FuturesVenue, Position};
+use super::venue::{
+    AccountSummary, FuturesSnapshot, FuturesVenue, NewOrder, OrderRecord, OrderReceipt, OrderSide,
+    Position,
+};
 use super::VenueMode;
 use crate::market::now_ms;
 use crate::market::ratelimit::WeightLimiter;
@@ -124,6 +127,82 @@ impl BinanceFutures {
             Err(e) => Err(e),
         }
     }
+
+    /// Performs a signed POST. Binance's SIGNED endpoints read their parameters off the query
+    /// string regardless of HTTP method, so this mirrors `signed_get` rather than sending a
+    /// form-encoded body — one less place the signed string and the sent string could diverge.
+    async fn signed_post(&self, path: &str, query: Query, weight: f64) -> Result<Value, String> {
+        self.sync_time_if_stale().await?;
+        self.limiter.take(weight)?;
+
+        let query = query.sign_with(&self.credential.secret, self.time.now_ms())?;
+        let response = self
+            .client
+            .post(format!("{}?{query}", self.url(path)))
+            .header("X-MBX-APIKEY", &self.credential.key)
+            .send()
+            .await
+            .map_err(|e| format!("could not reach Binance futures: {e}"))?;
+
+        let status = response.status();
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        if !status.is_success() {
+            return Err(describe_api_error(status.as_u16(), &body));
+        }
+        serde_json::from_str(&body).map_err(|e| format!("unreadable response from {path}: {e}"))
+    }
+
+    /// Performs a signed DELETE. Same shape as `signed_post` — see there for why the query is
+    /// carried in the URL rather than a body.
+    async fn signed_delete(&self, path: &str, query: Query, weight: f64) -> Result<Value, String> {
+        self.sync_time_if_stale().await?;
+        self.limiter.take(weight)?;
+
+        let query = query.sign_with(&self.credential.secret, self.time.now_ms())?;
+        let response = self
+            .client
+            .delete(format!("{}?{query}", self.url(path)))
+            .header("X-MBX-APIKEY", &self.credential.key)
+            .send()
+            .await
+            .map_err(|e| format!("could not reach Binance futures: {e}"))?;
+
+        let status = response.status();
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        if !status.is_success() {
+            return Err(describe_api_error(status.as_u16(), &body));
+        }
+        serde_json::from_str(&body).map_err(|e| format!("unreadable response from {path}: {e}"))
+    }
+}
+
+fn order_receipt(body: &Value) -> Result<OrderReceipt, String> {
+    Ok(OrderReceipt {
+        order_id: body
+            .get("orderId")
+            .and_then(Value::as_i64)
+            .ok_or_else(|| format!("no orderId in Binance's response: {body}"))?,
+        symbol: field_str(body, "symbol").unwrap_or_default(),
+        status: field_str(body, "status").unwrap_or_default(),
+        avg_price: field_f64(body, "avgPrice").unwrap_or(0.0),
+        executed_qty: field_f64(body, "executedQty").unwrap_or(0.0),
+    })
+}
+
+fn order_record(row: &Value) -> Option<OrderRecord> {
+    Some(OrderRecord {
+        order_id: row.get("orderId").and_then(Value::as_i64)?,
+        symbol: field_str(row, "symbol")?,
+        side: field_str(row, "side").unwrap_or_default(),
+        order_type: field_str(row, "type").unwrap_or_default(),
+        status: field_str(row, "status").unwrap_or_default(),
+        price: field_f64(row, "price").unwrap_or(0.0),
+        avg_price: field_f64(row, "avgPrice").unwrap_or(0.0),
+        orig_qty: field_f64(row, "origQty").unwrap_or(0.0),
+        executed_qty: field_f64(row, "executedQty").unwrap_or(0.0),
+        reduce_only: row.get("reduceOnly").and_then(Value::as_bool).unwrap_or(false),
+        time: row.get("time").and_then(Value::as_i64).unwrap_or(0),
+    })
 }
 
 /// Binance answers a bad key, a wrong permission, and a drifted clock all with HTTP 401/400 and
@@ -276,6 +355,88 @@ impl FuturesVenue for BinanceFutures {
         Ok(format!(
             "Connected to Binance futures {venue} — {assets} assets, clock offset {drift} ms"
         ))
+    }
+
+    async fn place_order(&self, order: NewOrder) -> Result<OrderReceipt, String> {
+        let mut query = Query::new();
+        query.push("symbol", &order.symbol)?;
+        query.push("side", order.side.as_binance_str())?;
+        query.push("type", order.order_type.as_binance_str())?;
+        query.push("quantity", order.quantity)?;
+        if order.reduce_only {
+            query.push("reduceOnly", "true")?;
+        }
+        if let Some(price) = order.price {
+            query.push("price", price)?;
+            query.push("timeInForce", "GTC")?;
+        }
+
+        let body = self.signed_post("/fapi/v1/order", query, 1.0).await?;
+        order_receipt(&body)
+    }
+
+    async fn cancel_order(&self, symbol: &str, order_id: i64) -> Result<(), String> {
+        let mut query = Query::new();
+        query.push("symbol", symbol)?;
+        query.push("orderId", order_id)?;
+        self.signed_delete("/fapi/v1/order", query, 1.0).await?;
+        Ok(())
+    }
+
+    async fn close_position(
+        &self,
+        symbol: &str,
+        side: OrderSide,
+        quantity: Option<f64>,
+    ) -> Result<OrderReceipt, String> {
+        let mut query = Query::new();
+        query.push("symbol", symbol)?;
+        query.push("side", side.as_binance_str())?;
+        query.push("type", "MARKET")?;
+        match quantity {
+            // A full close: Binance closes whatever the position's current size is, sidestepping
+            // the race between reading the size and building the order.
+            None => query.push("closePosition", "true")?,
+            Some(qty) => {
+                query.push("quantity", qty)?;
+                query.push("reduceOnly", "true")?;
+            }
+        }
+
+        let body = self.signed_post("/fapi/v1/order", query, 1.0).await?;
+        order_receipt(&body)
+    }
+
+    async fn set_leverage(&self, symbol: &str, leverage: u32) -> Result<(), String> {
+        let mut query = Query::new();
+        query.push("symbol", symbol)?;
+        query.push("leverage", leverage)?;
+        self.signed_post("/fapi/v1/leverage", query, 1.0).await?;
+        Ok(())
+    }
+
+    async fn set_margin_type(&self, symbol: &str, isolated: bool) -> Result<(), String> {
+        let mut query = Query::new();
+        query.push("symbol", symbol)?;
+        query.push("marginType", if isolated { "ISOLATED" } else { "CROSSED" })?;
+        match self.signed_post("/fapi/v1/marginType", query, 1.0).await {
+            Ok(_) => Ok(()),
+            // -4046: "No need to change margin type" — the symbol is already set the way the
+            // caller asked for. That is success, not a failure the trader needs to see.
+            Err(e) if e.contains("-4046") => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn order_history(&self, symbol: &str, limit: u32) -> Result<Vec<OrderRecord>, String> {
+        let mut query = Query::new();
+        query.push("symbol", symbol)?;
+        query.push("limit", limit)?;
+        let body = self.signed_get("/fapi/v1/allOrders", query, 5.0).await?;
+        let rows = body.as_array().cloned().unwrap_or_default();
+        let mut records: Vec<OrderRecord> = rows.iter().filter_map(order_record).collect();
+        records.sort_by_key(|r| std::cmp::Reverse(r.time));
+        Ok(records)
     }
 }
 

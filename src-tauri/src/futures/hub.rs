@@ -10,7 +10,7 @@
 //! its own reconnect ladder — is a second failure surface that buys latency this panel does not
 //! need. The polling loop is the same fallback the market feed already drops to.
 
-use super::venue::{FuturesSnapshot, FuturesVenue};
+use super::venue::{FuturesSnapshot, FuturesVenue, NewOrder, OrderRecord, OrderReceipt, OrderSide};
 use super::{FuturesSettings, VenueMode};
 use crate::config::ConfigState;
 use crate::secrets;
@@ -175,6 +175,66 @@ impl FuturesHub {
             .venue()
             .ok_or_else(|| "no API key stored for this venue".to_string())?;
         venue.check_credentials().await
+    }
+
+    /// The one gate every money-moving method below goes through. Reads the *current* state
+    /// rather than the settings a caller might still be holding, so a venue switch mid-request
+    /// cannot be raced into an order landing on mainnet.
+    fn ensure_trading_allowed(&self) -> Result<(), String> {
+        if self.inner.read().unwrap().state.trading_allowed {
+            Ok(())
+        } else {
+            Err("orders can only be placed on the testnet".into())
+        }
+    }
+
+    fn venue_or_err(&self) -> Result<std::sync::Arc<dyn FuturesVenue>, String> {
+        self.venue().ok_or_else(|| "no API key stored for this venue".to_string())
+    }
+
+    /// Places an order, then folds a fresh snapshot into state so the position table reflects it
+    /// on the very next render rather than waiting up to `POLL_INTERVAL` for the background loop.
+    pub async fn place_order(&self, order: NewOrder) -> Result<OrderReceipt, String> {
+        self.ensure_trading_allowed()?;
+        let receipt = self.venue_or_err()?.place_order(order).await?;
+        let _ = self.refresh().await;
+        Ok(receipt)
+    }
+
+    pub async fn close_position(
+        &self,
+        symbol: String,
+        side: OrderSide,
+        quantity: Option<f64>,
+    ) -> Result<OrderReceipt, String> {
+        self.ensure_trading_allowed()?;
+        let receipt = self
+            .venue_or_err()?
+            .close_position(&symbol, side, quantity)
+            .await?;
+        let _ = self.refresh().await;
+        Ok(receipt)
+    }
+
+    pub async fn cancel_order(&self, symbol: String, order_id: i64) -> Result<(), String> {
+        self.ensure_trading_allowed()?;
+        self.venue_or_err()?.cancel_order(&symbol, order_id).await
+    }
+
+    pub async fn set_leverage(&self, symbol: String, leverage: u32) -> Result<(), String> {
+        self.ensure_trading_allowed()?;
+        self.venue_or_err()?.set_leverage(&symbol, leverage).await
+    }
+
+    pub async fn set_margin_type(&self, symbol: String, isolated: bool) -> Result<(), String> {
+        self.ensure_trading_allowed()?;
+        self.venue_or_err()?.set_margin_type(&symbol, isolated).await
+    }
+
+    /// Order history is a read, not a trade — available on mainnet too, unlike everything else
+    /// in this block.
+    pub async fn order_history(&self, symbol: String, limit: u32) -> Result<Vec<OrderRecord>, String> {
+        self.venue_or_err()?.order_history(&symbol, limit).await
     }
 
     pub fn emit(&self) {

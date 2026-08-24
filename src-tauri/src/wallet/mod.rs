@@ -54,6 +54,10 @@ pub struct WalletSettings {
     /// Whether the floating price pill is shown. The wallet is the main window now; the pill is
     /// an extra the user opts into from settings.
     pub widget_enabled: bool,
+    /// Ticker of the chain's native currency — "ETH" on mainnet and most L2s, "POL" on Polygon,
+    /// "BNB" on BSC. Set alongside `rpc_url`/`chain_id` by `set_wallet_network`, never inferred:
+    /// there is no RPC call that answers "what do you call your gas token".
+    pub native_symbol: String,
 }
 
 impl Default for WalletSettings {
@@ -66,6 +70,7 @@ impl Default for WalletSettings {
             // On by default so an existing user, for whom the pill *was* the app, still finds
             // it where they left it after the update.
             widget_enabled: true,
+            native_symbol: "ETH".to_string(),
         }
     }
 }
@@ -80,6 +85,7 @@ mod tests {
         assert_eq!(settings.chain_id, 1);
         assert!(settings.rpc_url.starts_with("https://"));
         assert_eq!(settings.account_index, 0);
+        assert_eq!(settings.native_symbol, "ETH");
     }
 
     #[test]
