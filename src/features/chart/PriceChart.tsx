@@ -24,11 +24,11 @@ export function PriceChart({ candles, type }: Props) {
     const chart = createChart(containerRef.current, {
       layout: {
         background: { color: "transparent" },
-        textColor: "#9aacb8",
+        textColor: "#9aa3a8",
         fontFamily: "Cascadia Mono, JetBrains Mono, Consolas, monospace",
         fontSize: 10,
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: "#1a2027" } },
+      grid: { vertLines: { visible: false }, horzLines: { color: "#1a1d20" } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false },
       autoSize: true,
@@ -52,20 +52,20 @@ export function PriceChart({ candles, type }: Props) {
 
     if (type === "area") {
       const series = chart.addSeries(AreaSeries, {
-        lineColor: "#4fa3ff",
-        topColor: "rgba(79,163,255,0.28)",
-        bottomColor: "rgba(79,163,255,0.02)",
+        lineColor: "#1fd67a",
+        topColor: "rgba(31,214,122,0.28)",
+        bottomColor: "rgba(31,214,122,0.02)",
         lineWidth: 1,
       });
       series.setData(candles.map((c) => ({ time: c.time as Time, value: c.close })));
       seriesRef.current = series;
     } else {
       const series = chart.addSeries(CandlestickSeries, {
-        upColor: "#35d07f",
-        downColor: "#ef5b5b",
+        upColor: "#2fe98d",
+        downColor: "#ff6161",
         borderVisible: false,
-        wickUpColor: "#35d07f",
-        wickDownColor: "#ef5b5b",
+        wickUpColor: "#2fe98d",
+        wickDownColor: "#ff6161",
       });
       series.setData(
         candles.map((c) => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })),
