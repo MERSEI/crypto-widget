@@ -3,7 +3,7 @@ import type { ConnectionStatus, FxRate } from "../../types/market";
 
 /** Which panel tab is showing. Deliberately not persisted: the widget's job is to answer
  *  "where's the market right now" on sight, so it always reopens on the watchlist. */
-export type PanelTab = "watch" | "futures" | "referral";
+export type PanelTab = "watch" | "ai" | "futures" | "referral";
 
 interface UiState {
   expanded: boolean;

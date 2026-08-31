@@ -42,13 +42,22 @@ in half a second without switching windows.
   phrase never reaches the interface except when you ask to see it for a backup, and signing
   happens entirely in Rust. Token decimals are read from the contract, amounts never touch a JS
   `number`, and a fee that has run away from the one you approved is refused rather than signed.
+- **AI research.** Optional, off by default: an "AI" tab that asks Claude what is happening to a
+  coin you follow, or scans the market for projects worth a look. The model runs live web
+  searches, and every headline and citation is a link you can open — the panel drops any it
+  cannot link. CoinGecko's figures (rank, market cap, supply, distance from the all-time high)
+  are fetched separately and shown in their own block, so the measured half is never mistaken
+  for the argued one. Answers are cached on disk for a window you choose; only the refresh
+  button pays again, and each card shows the model, the search count, the tokens, and the age of
+  the answer. Bring your own Anthropic API key — it is stored in the Windows Credential Manager
+  and the call goes straight from your machine to the API.
 - **Referral links.** Partner affiliate links built from your own IDs, with a QR code.
 - **Tray integration.** Show/hide, pin, wallet, settings, and quit from the system tray.
 
 No telemetry, and no account is needed for anything the widget shows by default — the market data
-endpoints are all public. The optional features (futures, wallet, Etherscan history) take
-credentials, and those live in the Windows Credential Manager, never in `settings.json` and never
-in the renderer.
+endpoints are all public. The optional features (futures, wallet, Etherscan history, AI research)
+take credentials, and those live in the Windows Credential Manager, never in `settings.json` and
+never in the renderer.
 
 ## Stack
 
@@ -120,9 +129,9 @@ Runtime state lives in the Tauri app config directory
 | Path             | Contents                                                          |
 | ---------------- | ----------------------------------------------------------------- |
 | `settings.json`  | Window position, display/chart preferences, watchlist, alert rules |
-| `cache/`         | TTL-cached `exchangeInfo` catalog, FX rate, last known tickers     |
+| `cache/`         | TTL-cached `exchangeInfo` catalog, FX rate, last known tickers, AI reports |
 
-`settings.json` is versioned (`version: 1`) and written at most twice a second by a background
+`settings.json` is versioned (`version: 4`) and written at most twice a second by a background
 flush task. A corrupt file is backed up rather than deleted, and the app falls back to defaults.
 
 ## Project layout
@@ -130,17 +139,18 @@ flush task. A corrupt file is backed up rather than deleted, and the app falls b
 ```
 src/                      React renderer
   app/                    App shell, error boundary, theme
-  core/format/            Price / percent / volume formatting
+  core/format/            Price / percent / volume / age / symbol formatting
   core/ipc/               Typed wrappers over Tauri invoke + event listeners
-  core/store/             Zustand stores (tickers, watchlist, alerts, settings, ui, wallet)
-  features/               Pill, watchlist, chart, alerts, settings, futures, referral, wallet
-  types/                  Shared market + settings + wallet types (mirror the Rust structs)
+  core/store/             Zustand stores (tickers, watchlist, alerts, settings, ui, wallet, insights)
+  features/               Pill, watchlist, chart, alerts, settings, futures, referral, wallet, insights
+  types/                  Shared market + settings + wallet + insights types (mirror the Rust structs)
 src-tauri/src/            Rust backend
   market/                 Binance WS client, REST provider, FX provider, market hub
   alerts/                 Spike detector + alert engine
   futures/                Signed exchange client, account hub, futures commands
   referral/               Partner catalogue and link building
   wallet/                 Keystore (BIP-39/44), chain client, Etherscan history, commands
+  insights/               Anthropic client, CoinGecko fundamentals, research commands
   secrets.rs              OS credential store — the only place a secret is written
   commands.rs             Every #[tauri::command] exposed to the renderer
   config.rs               Settings schema, load/save, TTL cache helpers
@@ -163,6 +173,11 @@ docs/                     Architecture notes
 - Wallet: import a known test phrase — the address must match what MetaMask shows for it.
 - Wallet: send a testnet transfer, then edit the amount after the quote — the confirm button
   must go back to "Review transfer" rather than staying armed with the old fee.
+- AI: open the AI tab with no key stored — it must offer the key form and never call anything.
+- AI: research a coin, collapse and reopen the panel — the report comes back from disk with a
+  "cached" footer and no second charge.
+- AI: click a headline — it opens in the browser; a link that is not in a stored report is
+  refused with a message rather than opened.
 - Wallet: turn the price pill off — it disappears immediately and stays gone after a restart,
   and the tray icon opens the wallet.
 
@@ -179,6 +194,10 @@ docs/                     Architecture notes
   hardware wallet support, and no address book.
 - **Transaction history needs a free Etherscan API key.** There is no public endpoint that
   serves it; without a key the rest of the wallet works and the history tab says so.
+- **AI research needs your own Anthropic key and spends money per call.** There is no free
+  tier and no proxy: the widget ships the feature switched off, and every report is a button
+  press. The answers are a model's opinion over web search — informative, not advice, and not
+  a substitute for reading the sources it cites.
 - No indicators — out of scope by design, see the original spec's "not-goals" section.
 
 ## License

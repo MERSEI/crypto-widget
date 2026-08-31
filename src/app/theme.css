@@ -1364,3 +1364,372 @@ body {
   opacity: 0.45;
   cursor: default;
 }
+
+/* ---------- AI research ---------- */
+
+.insights {
+  padding: 8px 10px 12px;
+  gap: 8px;
+}
+
+.insights__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-1);
+  line-height: 1.45;
+}
+
+.insights__intro strong {
+  color: var(--text-0);
+  font-size: 12px;
+}
+
+.insights__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.insights__modes {
+  display: flex;
+  gap: 2px;
+}
+
+.insights__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insights__row .select-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.insights__error {
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.4;
+  border-left: 2px solid var(--danger);
+  padding-left: 8px;
+  cursor: pointer;
+}
+
+/* A report takes a minute or two of server-side searching; a static line that says what is
+   happening beats a spinner that says only "wait". */
+.insights__working {
+  padding: 14px 0;
+  text-align: center;
+  color: var(--text-1);
+  animation: insights-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes insights-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insights__working { animation: none; opacity: 0.8; }
+}
+
+.insights__disclaimer {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.insights-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.insights-setup__stored {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-1);
+  font-size: 11px;
+}
+
+/* ---------- AI research: report card ---------- */
+
+.insights-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.insights-card__verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insights-verdict {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.insights-verdict--bullish { color: var(--up); }
+.insights-verdict--bearish { color: var(--down); }
+.insights-verdict--neutral { color: var(--text-1); }
+
+.insights-score {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.insights-score__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+
+.insights-score__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text-1);
+}
+
+.insights-score__fill--bullish { background: var(--up); }
+.insights-score__fill--bearish { background: var(--down); }
+
+.insights-score__value {
+  color: var(--text-1);
+  font-size: 11px;
+  min-width: 22px;
+  text-align: right;
+}
+
+.insights-card__summary {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text-0);
+}
+
+.insights-card__block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insights-card__block-title {
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.insights-list {
+  margin: 0;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.45;
+  color: var(--text-1);
+}
+
+.insights-list--up li::marker { color: var(--up); }
+.insights-list--down li::marker { color: var(--down); }
+
+.insights-news {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 8px;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.insights-news:hover {
+  background: var(--bg-1);
+}
+
+.insights-news__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+  background: var(--text-2);
+}
+
+.insights-news__dot--positive { background: var(--up); }
+.insights-news__dot--negative { background: var(--down); }
+
+.insights-news__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.insights-news__title {
+  color: var(--text-0);
+  line-height: 1.35;
+}
+
+.insights-news__impact {
+  color: var(--text-1);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.insights-news__meta {
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+.insights-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.insights-facts__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 6px;
+  background: var(--bg-1);
+  border-radius: 8px;
+}
+
+.insights-facts__label {
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+.insights-facts__value {
+  color: var(--text-0);
+  font-size: 11px;
+}
+
+.insights-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.insights-tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  font-size: 10px;
+}
+
+.insights-tag--link:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text-0);
+}
+
+.insights-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+/* ---------- AI research: scan ideas ---------- */
+
+.insights-idea {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 8px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.insights-idea--open {
+  border-color: var(--border);
+}
+
+.insights-idea__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.insights-idea__name {
+  color: var(--text-0);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.insights-idea__ticker {
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+.insights-idea__conviction {
+  color: var(--text-1);
+  font-size: 11px;
+}
+
+.insights-idea__category {
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.insights-idea__thesis {
+  margin: 0;
+  color: var(--text-1);
+  line-height: 1.45;
+}
+
+.insights-idea__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-1);
+  line-height: 1.45;
+}
+
+.insights-idea__label {
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.insights-idea__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}

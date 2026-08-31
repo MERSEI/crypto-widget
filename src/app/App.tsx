@@ -14,6 +14,7 @@ import { useTickersStore } from "../core/store/tickers";
 import { useUiStore } from "../core/store/ui";
 import { useWatchlistStore } from "../core/store/watchlist";
 import { FuturesPanel } from "../features/futures/FuturesPanel";
+import { InsightsPanel } from "../features/insights/InsightsPanel";
 import { Pill } from "../features/pill/Pill";
 import { usePillDrag } from "../features/pill/usePillDrag";
 import { ReferralPanel } from "../features/referral/ReferralPanel";
@@ -139,6 +140,7 @@ export function App() {
         <PanelTabs />
         <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {activeTab === "watch" && <WatchlistPanel />}
+          {activeTab === "ai" && <InsightsPanel />}
           {activeTab === "futures" && <FuturesPanel />}
           {activeTab === "referral" && <ReferralPanel />}
           {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}

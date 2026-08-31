@@ -211,18 +211,64 @@ The wallet has its own window (`index.html?window=wallet`), like the futures ter
 has to read character by character. `wallet.widgetEnabled` makes the pill itself optional — with
 it off, the tray icon opens the wallet instead of expanding a pill that is not there.
 
+## AI research
+
+`src-tauri/src/insights/` is the only module that returns an **opinion** rather than a fact, and
+the only one where a single command costs the user money. Both properties drive the design.
+
+- `ai.rs` — the Anthropic Messages API over raw HTTP (there is no official Rust SDK). Three
+  failure modes it exists to get right: a server-tool turn can answer `stop_reason: "pause_turn"`
+  with half a turn that has to be echoed back verbatim to continue; a *failed* web search arrives
+  as HTTP 200 with an error **object** where the success case has a **list**, so parsing it as an
+  empty result set would report "no sources" for a hard failure; and the web-search tool type is
+  model-gated, so the current variant sent to an older model is a 400 rather than a downgrade.
+- `coingecko.rs` — the measured half. Market cap, rank, supply, distance from the ATH and
+  community sentiment, cached on disk and falling back to a stale copy on a 429 rather than
+  failing the report. `pick_best` decides which listing a ticker means — an exact symbol match
+  with the best market-cap rank — because dozens of dead tokens share a live asset's ticker.
+- `commands.rs` — prompts, cache, sanitising, and the IPC surface.
+
+Four rules hold the feature together:
+
+1. **No call without a click.** There is no poll loop and no prefetch. Opening the tab, switching
+   symbols and reopening the panel read the disk cache (`get_cached_insight` / `get_cached_scan`);
+   only `research_coin` / `research_market` reach the model, and only `refresh: true` pays for an
+   answer that is already on disk.
+2. **One call at a time.** A `Mutex` in `commands.rs` refuses a second request instead of queueing
+   it — a double-clicked button that bills twice is the failure it prevents. The renderer's `busy`
+   flag is a convenience on top; the backend is the guarantee.
+3. **Measured and argued stay separate.** `CoinInsight.analysis` is the model's; `.fundamentals`
+   is CoinGecko's; `.sources` are harvested from the search-result blocks rather than from the
+   model's prose, so the citation list cannot be fabricated. The panel renders them as three
+   labelled blocks for the same reason.
+4. **Every link is vouched for.** `open_insight_url` refuses any URL that is not present, field
+   for field, in a stored report — the same rule `open_referral_url` follows, and with more force
+   here, because every string in a report was written by a model or lifted from a search result.
+
+Anything the model returns is clamped before it is stored: a score above 100, a 300-item idea
+list, a headline with no URL. A missing section degrades one block of the card; it never fails a
+call that has already been billed, which is why every field in `Analysis` carries a
+`serde(default)`.
+
+The Anthropic key lives in the OS credential store under the `anthropic` namespace via
+`save_raw`/`status_raw` — one opaque string, not a key/secret pair. Filing it as a pair would
+make `status` report a stored key as missing.
+
 ## Persistence
 
 `ConfigState` loads `settings.json` from the Tauri app config dir on startup, keeps it behind an
 `RwLock`, and a background task flushes it **at most twice a second** when dirty. Commands mutate
 the struct and call `mark_dirty()` — no command writes to disk synchronously.
 
-- Schema is versioned (`SETTINGS_VERSION = 3`; every added section is `#[serde(default)]`, so an
+- Schema is versioned (`SETTINGS_VERSION = 4`; every added section is `#[serde(default)]`, so an
   older file gains defaults instead of failing to parse — a parse failure backs the file up and
   starts over, taking the watchlist and alerts with it); the Rust structs are `camelCase`-serialized and
   mirrored by `src/types/settings.ts`. **Changing one means changing the other.**
 - A corrupt file is *backed up*, not deleted, and the app starts from defaults.
-- `cache/` holds TTL envelopes (`saved_at` + value) for the catalog, FX rate, and last tickers.
+- `cache/` holds TTL envelopes (`saved_at` + value) for the catalog, FX rate, last tickers,
+  CoinGecko lookups, and AI reports. The report TTL is the user's `insights.cacheTtlMin`, read at
+  serve time rather than baked in at write time, so shortening the window expires answers that
+  are already on disk.
 
 ## IPC contract
 
@@ -243,6 +289,10 @@ type-safely in `src/core/ipc/commands.ts`. Reads first, then mutations, then win
 | `add_wallet_token` / `remove_wallet_token` / `set_etherscan_key` / `clear_etherscan_key` | Wallet setup |
 | `quote_wallet_transfer` / `send_wallet_transfer` | Transfer, reviewed then confirmed           |
 | `open_wallet_window` / `open_futures_window`     | Secondary windows                           |
+| `get_insights_state` / `get_cached_insight` / `get_cached_scan` | AI reads — never call the model |
+| `set_insights_settings` / `set_anthropic_key` / `clear_anthropic_key` | AI setup              |
+| `research_coin` / `research_market`      | The paid calls, one click each                 |
+| `open_insight_url`                       | Opens a link that is in a stored report        |
 
 Events flow the other way (`src/core/ipc/events.ts`):
 
@@ -273,6 +323,9 @@ Zustand, one store per concern, no global god-object:
 - `wallet` — wallet state, balances and history, each with its own loading/error slice: history
   needs an Etherscan key and balances do not, so a rate-limited history must not blank out
   balances that loaded fine
+- `insights` — AI settings, the current coin report and the market scan, plus one `busy` flag
+  (the backend serialises calls, so two spinners could never both be true). A late cache read for
+  a symbol the user has moved away from is dropped rather than rendered under the wrong heading.
 
 `features/` holds the visual units (pill + drag hook, watchlist rows and search dialog, chart
 accordion with timeframe bar, alert editor and list, settings panel and status bar). `core/format/`
@@ -283,8 +336,8 @@ prices is the kind of thing that silently regresses.
 
 | Layer          | Command             | Covers                                                                   |
 | -------------- | ------------------- | ------------------------------------------------------------------------ |
-| TypeScript     | `npm run test`      | Format helpers, ticker store selectors                                    |
-| Rust           | `cargo test`        | Spike detector, alert engine decision logic, WS backoff, kline/ticker parsing (against captured real payloads), settings load/corrupt-recovery |
+| TypeScript     | `npm run test`      | Format helpers, ticker store selectors, the insights store's "no call without a click" rule |
+| Rust           | `cargo test`        | Spike detector, alert engine decision logic, WS backoff, kline/ticker parsing (against captured real payloads), settings load/corrupt-recovery, AI report parsing and link vouching |
 
 CI (`.github/workflows/ci.yml`) runs both suites on every push and PR, split by platform: the
 frontend job (typecheck → vitest → `vite build`) on Linux, the Rust job (`clippy -D warnings` →

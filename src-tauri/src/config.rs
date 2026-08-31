@@ -1,4 +1,5 @@
 use crate::futures::FuturesSettings;
+use crate::insights::InsightsSettings;
 use crate::referral::ReferralSettings;
 use crate::wallet::WalletSettings;
 use serde::{Deserialize, Serialize};
@@ -8,12 +9,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
-/// Bumped to 2 for the futures and referral sections, then to 3 for the wallet. There is no
+/// Bumped to 2 for the futures and referral sections, then to 3 for the wallet, then to 4 for
+/// AI research. There is no
 /// migration step: every added section is `#[serde(default)]`, so an older file loads as-is and
 /// simply gains the defaults. That is the only safe way to extend this struct — see `load_settings_from`, which
 /// answers a parse failure by backing the file up and starting from scratch. A new *required*
 /// field would therefore wipe every existing user's watchlist, alerts, and window position.
-pub const SETTINGS_VERSION: u32 = 3;
+pub const SETTINGS_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -148,6 +150,8 @@ pub struct AppSettings {
     pub referral: ReferralSettings,
     #[serde(default)]
     pub wallet: WalletSettings,
+    #[serde(default)]
+    pub insights: InsightsSettings,
     /// Which watchlist symbol the pill shows, chosen explicitly rather than always the first
     /// row. `None` falls back to the first watchlist item, same as before this existed.
     #[serde(default, rename = "pinnedSymbol")]
@@ -168,6 +172,7 @@ impl Default for AppSettings {
             futures: FuturesSettings::default(),
             referral: ReferralSettings::default(),
             wallet: WalletSettings::default(),
+            insights: InsightsSettings::default(),
             pinned_symbol: None,
         }
     }
@@ -321,6 +326,7 @@ mod tests {
         // The new sections arrive at their defaults, with the feature switched off.
         assert!(!loaded.futures.enabled);
         assert!(loaded.referral.partner.is_none());
+        assert!(!loaded.insights.enabled, "a feature that spends money never arrives switched on");
 
         assert!(
             !dir.join("settings.corrupt.json").exists(),

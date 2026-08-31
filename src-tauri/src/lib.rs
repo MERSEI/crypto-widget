@@ -2,6 +2,7 @@ mod alerts;
 mod commands;
 mod config;
 mod futures;
+mod insights;
 mod market;
 mod referral;
 mod secrets;
@@ -235,6 +236,15 @@ pub fn run() {
             wallet::commands::quote_wallet_transfer,
             wallet::commands::send_wallet_transfer,
             wallet::commands::open_wallet_window,
+            insights::commands::get_insights_state,
+            insights::commands::set_insights_settings,
+            insights::commands::set_anthropic_key,
+            insights::commands::clear_anthropic_key,
+            insights::commands::get_cached_insight,
+            insights::commands::get_cached_scan,
+            insights::commands::research_coin,
+            insights::commands::research_market,
+            insights::commands::open_insight_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

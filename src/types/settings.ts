@@ -1,3 +1,4 @@
+import type { InsightsSettings } from "./insights";
 import type { ChartType, Timeframe } from "./market";
 import type { WalletSettings } from "./wallet";
 
@@ -79,6 +80,7 @@ export interface AppSettings {
   futures: FuturesSettings;
   referral: ReferralSettings;
   wallet: WalletSettings;
+  insights: InsightsSettings;
   /** Which watchlist symbol the pill shows. `null` falls back to the first watchlist row. */
   pinnedSymbol: string | null;
 }

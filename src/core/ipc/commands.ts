@@ -8,6 +8,11 @@ import type {
   OrderSide,
   VenueMode,
 } from "../../types/futures";
+import type {
+  CoinInsight,
+  InsightsState,
+  MarketScan,
+} from "../../types/insights";
 import type { Candle, ConnectionStatus, FxRate, PairInfo, TickerSnapshot } from "../../types/market";
 import type { Partner, ReferralProfile } from "../../types/referral";
 import type { Alert, AppSettings } from "../../types/settings";
@@ -126,6 +131,34 @@ export const commands = {
     approvedMaxCostWei: string,
   ) => invoke<string>("send_wallet_transfer", { to, amount, contract, approvedMaxCostWei }),
   openWalletWindow: () => invoke<void>("open_wallet_window"),
+
+  // AI research. Every call here that reaches the model is triggered by a button: `research*`
+  // spends money, `getCached*` never does, and `refresh` is the only way to pay for an answer
+  // that is already on disk.
+  getInsightsState: () => invoke<InsightsState>("get_insights_state"),
+  setInsightsSettings: (
+    enabled: boolean,
+    model: string,
+    cacheTtlMin: number,
+    maxSearches: number,
+    language: string,
+  ) =>
+    invoke<InsightsState>("set_insights_settings", {
+      enabled,
+      model,
+      cacheTtlMin,
+      maxSearches,
+      language,
+    }),
+  setAnthropicKey: (apiKey: string) => invoke<InsightsState>("set_anthropic_key", { apiKey }),
+  clearAnthropicKey: () => invoke<InsightsState>("clear_anthropic_key"),
+  getCachedInsight: (symbol: string) => invoke<CoinInsight | null>("get_cached_insight", { symbol }),
+  getCachedScan: () => invoke<MarketScan | null>("get_cached_scan"),
+  researchCoin: (symbol: string, refresh: boolean) =>
+    invoke<CoinInsight>("research_coin", { symbol, refresh }),
+  researchMarket: (refresh: boolean) => invoke<MarketScan>("research_market", { refresh }),
+  /** Refused in Rust for any URL that isn't in a stored report — see `open_insight_url`. */
+  openInsightUrl: (url: string) => invoke<void>("open_insight_url", { url }),
 
   startDrag: () => invoke<void>("start_drag"),
   dragEnded: () => invoke<void>("drag_ended"),

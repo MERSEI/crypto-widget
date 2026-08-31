@@ -2,6 +2,7 @@ import { useUiStore, type PanelTab } from "../../core/store/ui";
 
 const TABS: Array<{ id: PanelTab; label: string; title: string }> = [
   { id: "watch", label: "WATCH", title: "Watchlist" },
+  { id: "ai", label: "AI", title: "AI research" },
   { id: "futures", label: "FUT", title: "Futures positions" },
   { id: "referral", label: "REF", title: "Referral links" },
 ];
